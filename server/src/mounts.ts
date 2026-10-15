@@ -16,14 +16,24 @@ export function hasMounts() {
 	return mounts.length > 0;
 }
 
-export function setMounts(entries: { folder: string, mountedAt: string }[]) {
-	const next = entries.filter(it => it.mountedAt).map(it => ({
+type MountEntry = { folder: string, mountedAt: string };
+
+function buildMounts(entries: MountEntry[]) {
+	return entries.filter(it => it.mountedAt).map(it => ({
 		realPrefix: folderPrefix(it.folder),
 		mountPrefix: folderPrefix(resolve(it.folder, it.mountedAt))
 	})).filter(it => it.realPrefix.toLowerCase() !== it.mountPrefix.toLowerCase());
-	const changed = next.length !== mounts.length || next.some((it, i) =>
+}
+
+export function mountsChanged(entries: MountEntry[]) {
+	const next = buildMounts(entries);
+	return next.length !== mounts.length || next.some((it, i) =>
 		it.realPrefix !== mounts[i].realPrefix || it.mountPrefix !== mounts[i].mountPrefix);
-	mounts = next;
+}
+
+export function setMounts(entries: MountEntry[]) {
+	const changed = mountsChanged(entries);
+	mounts = buildMounts(entries);
 	return changed;
 }
 

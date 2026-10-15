@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Diagnostic } from 'vscode-languageserver';
 import {
-	Lexer, URI, clearLibSymbols, configCache, hasMounts, lexers, mountedUri, openFile,
+	Lexer, URI, clearLibSymbols, configCache, hasMounts, lexers, mountedUri, mountsChanged, openFile,
 	parseFolder, setMounts, setWorkspaceFolders, utils
 } from '../common';
 import { runProjectDiagnostics } from '../projectDiagnostics';
@@ -77,6 +77,12 @@ suite('Test mounted folders', () => {
 		assert.deepEqual(Object.keys(lexers).filter(k => k.includes('ahk2-lsp-mount-')), [lex.uri]);
 		delete lexers[key(path)];
 		assert.equal(lexers[lex.uri], undefined);
+	});
+
+	test('mountsChanged compares against the active table without applying it', () => {
+		assert.equal(mountsChanged([{ folder: shared, mountedAt: '../host/app/commons' }]), false);
+		assert.equal(mountsChanged([]), true);
+		assert.ok(hasMounts());
 	});
 
 	test('relative includes resolve through the mount into the host', () => {
