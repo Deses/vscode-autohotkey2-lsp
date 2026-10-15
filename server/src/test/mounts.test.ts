@@ -4,7 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Diagnostic } from 'vscode-languageserver';
 import {
-	Lexer, URI, clearLibSymbols, configCache, hasMounts, lexers, mountedUri, mountsChanged, openFile,
+	Lexer, URI, clearLibSymbols, configCache, hasMounts, lexers, mountAffects, mountedUri, mountsChanged, openFile,
 	parseFolder, setMounts, setWorkspaceFolders, utils
 } from '../common';
 import { runProjectDiagnostics } from '../projectDiagnostics';
@@ -77,6 +77,25 @@ suite('Test mounted folders', () => {
 		assert.deepEqual(Object.keys(lexers).filter(k => k.includes('ahk2-lsp-mount-')), [lex.uri]);
 		delete lexers[key(path)];
 		assert.equal(lexers[lex.uri], undefined);
+	});
+
+	test('keys outside the mounted folder are used exactly as given', () => {
+		const builtin = 'file:///c%3A/Ext/Syntaxes/Ahk2.d.ahk';
+		const lex = new Lexer(openFile(join(shared, 'Core.ahk2'))!);
+		lexers[builtin] = lex;
+		assert.equal(lexers[builtin], lex);
+		assert.deepEqual(Object.keys(lexers).filter(k => k === builtin), [builtin]);
+		delete lexers[builtin];
+		assert.equal(lexers[builtin], undefined);
+	});
+
+	test('a mount change only affects uris inside the old or new mount', () => {
+		const affects = mountAffects([{ folder: shared, mountedAt: '../elsewhere' }]);
+		assert.equal(affects(URI.file(join(shared, 'Core.ahk2')).toString()), true);
+		assert.equal(affects(URI.file(join(host, 'app', 'commons', 'Core.ahk2')).toString()), true);
+		assert.equal(affects(URI.file(join(root, 'elsewhere', 'X.ahk2')).toString()), true);
+		assert.equal(affects(URI.file(join(host, 'app', 'Main.ahk2')).toString()), false);
+		assert.equal(affects('file:///c%3A/Ext/Syntaxes/Ahk2.d.ahk'), false);
 	});
 
 	test('mountsChanged compares against the active table without applying it', () => {

@@ -31,6 +31,15 @@ export function mountsChanged(entries: MountEntry[]) {
 		it.realPrefix !== mounts[i].realPrefix || it.mountPrefix !== mounts[i].mountPrefix);
 }
 
+export function mountAffects(entries: MountEntry[]) {
+	const prefixes = [...mounts, ...buildMounts(entries)]
+		.flatMap(it => [it.realPrefix, it.mountPrefix]).map(it => it.toLowerCase());
+	return (uri: string) => {
+		const lower = uri.toLowerCase();
+		return prefixes.some(prefix => lower.startsWith(prefix));
+	};
+}
+
 export function setMounts(entries: MountEntry[]) {
 	const changed = mountsChanged(entries);
 	mounts = buildMounts(entries);
@@ -50,5 +59,8 @@ export function mountedUri(uri: string) {
 }
 
 export function mountedKey(key: string) {
-	return mounts.length ? mountedUri(key).toLowerCase() : key;
+	if (!mounts.length)
+		return key;
+	const mapped = mountedUri(key);
+	return mapped === key ? key : mapped.toLowerCase();
 }

@@ -7,7 +7,7 @@ import {
 	a_Vars, ahkVars, chinesePunctuations, codeActionProvider, colorPresentation,
 	colorProvider, completionProvider, configCache, defintionProvider, documentFormatting, enumNames,
 	fullySemanticToken, getRequestHandlers, hoverProvider, initCaches, initLocalize, isahk2_h, Lexer, lexers,
-	loadSyntax, LSConfig, MessageType, mountsChanged, parseProject, parseUserLib, prepareRename, rangeFormatting,
+	loadSyntax, LSConfig, MessageType, mountAffects, mountsChanged, parseProject, parseUserLib, prepareRename, rangeFormatting,
 	readTextFile, referenceProvider, renameProvider, resolvePath, SemanticTokenModifiers, semanticTokensOnFull,
 	semanticTokensOnRange, SemanticTokenTypes, setIsAhkH, setLocale, setMounts, setRootDir, setWorkspaceFolders,
 	signatureProvider, symbolProvider, typeFormatting, updateConfig, URI, utils, winapis, workspaceSymbolProvider
@@ -221,8 +221,10 @@ async function loadMounts() {
 	const entries = folders.map((uri, i) => ({ folder: URI.parse(uri).fsPath, mountedAt: values[i] ?? '' }));
 	if (!mountsChanged(entries))
 		return;
-	const open = new Set<TextDocument>();
+	const affected = mountAffects(entries), open = new Set<TextDocument>();
 	for (const lex of new Set(Object.values(lexers))) {
+		if (!affected(lex.document.uri) && !affected(lex.uri))
+			continue;
 		lex.actived && open.add(lex.document);
 		lex.close(true);
 	}
