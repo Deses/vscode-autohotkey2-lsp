@@ -74,7 +74,7 @@ export async function activate(context: ExtensionContext) {
 	};
 
 	// Options to control the language client
-	const fsw = workspace.createFileSystemWatcher('**/*.{ahk}');
+	const fsw = workspace.createFileSystemWatcher('**/*.{ahk,ahk2,ah2}');
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [{ language: 'ahk2' }],
 		markdown: { isTrusted: true, supportHtml: true },
