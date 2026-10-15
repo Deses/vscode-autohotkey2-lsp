@@ -62,6 +62,7 @@ export interface LSConfig {
 	Files?: {
 		Exclude?: string[]
 		MaxDepth?: number
+		ScanMaxDepth?: number
 	}
 	FormatOptions?: FormatOptions
 	InlayHints?: {
@@ -70,6 +71,7 @@ export interface LSConfig {
 	}
 	InterpreterPath: string
 	GlobalStorage?: string
+	ProjectMissingIncludes?: boolean
 	Syntaxes?: string
 	SymbolFoldingFromOpenBrace?: boolean
 	Warn?: {
@@ -113,6 +115,7 @@ export const configCache: LSConfig = {
 		MaxDepth: 2
 	},
 	FormatOptions: {},
+	ProjectMissingIncludes: true,
 	InterpreterPath: 'C:\\Program Files\\AutoHotkey\\v2\\AutoHotkey.exe',
 	SymbolFoldingFromOpenBrace: false,
 	Warn: {
@@ -421,8 +424,7 @@ export function loadSyntax(filename = 'ahk2', d = 3) {
 }
 
 let scanExclude: { file?: RegExp[], folder?: RegExp[] } = {};
-export function enumFiles(dirpath: string, filter = /\.(ahk2?|ah2)$/i) {
-	const maxdepth = configCache.Files?.MaxDepth ?? 2;
+export function enumFiles(dirpath: string, filter = /\.(ahk2?|ah2)$/i, maxdepth = configCache.Files?.MaxDepth ?? 2) {
 	const { file: file_exclude, folder: folder_exclude } = scanExclude;
 	return enumfile(restorePath(dirpath), 0);
 	async function* enumfile(dirpath: string, depth: number): AsyncGenerator<string> {
@@ -487,7 +489,7 @@ export function updateConfig(config: LSConfig) {
 			scanExclude.file = file;
 		if (folder.length)
 			scanExclude.folder = folder;
-		if ((config.Files.MaxDepth ??= 2) < 0)
+		if ((config.Files.MaxDepth = config.Files.ScanMaxDepth ?? config.Files.MaxDepth ?? 2) < 0)
 			config.Files.MaxDepth = Infinity;
 	}
 	if (config.Syntaxes && !process.env.BROWSER) {
@@ -626,16 +628,22 @@ export function parseInclude(lex: Lexer, dir: string, _set = new Set()) {
 }
 
 export async function parseProject(uri: string, delay = 50) {
-	let lex = lexers[uri];
+	const lex = lexers[uri];
 	if (!lex || !uri.startsWith('file:'))
 		return;
 	!lex.d && (libSymbols[uri] ??= getLibSymbols(lex));
-	let searchdir = lex.workspaceFolder, workspace = false, path: string, t: TextDocument | undefined;
-	if (searchdir)
-		searchdir = URI.parse(searchdir).fsPath, workspace = true;
-	else searchdir = lex.scriptdir + '\\lib';
-	for await (path of enumFiles(searchdir)) {
-		if (!libSymbols[uri = URI.file(path).toString().toLowerCase()]) {
+	if (lex.workspaceFolder)
+		await parseFolder(URI.parse(lex.workspaceFolder).fsPath, true, delay);
+	else await parseFolder(lex.scriptdir + '\\lib', false, delay);
+}
+
+export async function parseFolder(searchdir: string, workspace: boolean, delay = 50,
+	maxdepth?: number, onFile?: (uri: string) => void) {
+	let lex: Lexer | undefined, t: TextDocument | undefined;
+	for await (const path of enumFiles(searchdir, undefined, maxdepth)) {
+		const uri = URI.file(path).toString().toLowerCase();
+		onFile?.(uri);
+		if (!libSymbols[uri]) {
 			if (!(lex = lexers[uri])) {
 				if (!(t = openFile(path)) || (lex = new Lexer(t)).d || (lex.parseScript(), lex.maybev1))
 					continue;

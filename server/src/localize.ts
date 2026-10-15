@@ -25,6 +25,7 @@ export const codeaction = {
 }
 
 export const diagnostic = {
+	missinginclude: localize('diagnostic.missinginclude', '\'{0}\' is defined in {1}, which this file does not include'),
 	acceptparams: localize('diagnostic.acceptparams', '\'{0}\' accepts {1} parameter(s)'),
 	assignerr: localize('diagnostic.assignerr', 'This {0} \'{1}\' cannot be used as an output variable'),
 	classinfuncerr: localize('diagnostic.classinfuncerr', 'Functions cannot contain classes'),

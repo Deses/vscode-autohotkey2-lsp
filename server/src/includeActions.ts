@@ -1,6 +1,6 @@
 import { relative, sep } from 'path';
 import { CodeAction, CodeActionKind, Diagnostic, Position, TextEdit } from 'vscode-languageserver';
-import { URI, codeaction, libSymbols, parseProject } from './common';
+import { URI, codeaction, diagnostic, libSymbols, parseProject } from './common';
 import type { Lexer } from './lexer';
 
 const scans = new Map<string, Promise<void>>();
@@ -21,7 +21,15 @@ function scanProject(lex: Lexer, rescan = false) {
 	return scan;
 }
 
-function findDefiningFiles(lex: Lexer, name: string) {
+export function missingIncludeInfo(lex: Lexer, name: string) {
+	const files = findDefiningFiles(lex, name);
+	if (!files.length)
+		return;
+	const shown = files.slice(0, 3).map(file => relative(lex.scriptpath, file));
+	return diagnostic.missinginclude(name, shown.join(' or ') + (files.length > 3 ? ', ...' : ''));
+}
+
+export function findDefiningFiles(lex: Lexer, name: string) {
 	const upper = name.toUpperCase(), dir = projectDir(lex), paths: string[] = [];
 	for (const uri in libSymbols) {
 		const symbols = libSymbols[uri], path = symbols.fsPath;

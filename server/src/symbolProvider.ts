@@ -1,12 +1,13 @@
 import { CancellationToken, DocumentSymbolParams, Range, SymbolInformation, WorkspaceSymbolParams } from 'vscode-languageserver';
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
-	ANY, ASSIGN_TYPE, AhkSymbol, CallSite, ClassNode, DiagnosticSeverity, DiagnosticTag, FuncNode, FuncScope, Lexer, Maybe, Module, Property, SK2STT,
+	ANY, ASSIGN_TYPE, AhkSymbol, CallSite, ClassNode, DiagnosticCode, DiagnosticSeverity, DiagnosticTag, FuncNode, FuncScope, Lexer, Maybe, Module, Property, SK2STT,
 	SUPER, SemanticToken, SemanticTokenModifiers, SemanticTokenTypes, SymbolKind, THIS, Token, TokenType, UNSET, URI, UnsetKind, VARREF, VOID, Variable, ZERO_RANGE,
 	ahkUris, ahkVars, ahkVersion, alpha_3, checkDupError, configCache, decltypeExpr, decltypeReturns, diagnostic, enumFiles, findClass, getAllModules,
 	getClassBase, getClassConstructor, getClassMember, getClassMembers, getImplicitImports, getModuleImporteds, getParamCount, getWorkspaceFile, hint, inactiveVars,
 	invokeCheck, isContinuousLine, lexers, openFile, resolveVarAlias, sym_related_msg, sym_type, utils, warn, workspaceFolders
 } from './common';
+import { missingIncludeInfo } from './includeActions';
 
 export function symbolProvider(params: DocumentSymbolParams, token?: CancellationToken): SymbolInformation[] {
 	const lex = Lexer.curr = lexers[params.textDocument.uri.toLowerCase()];
@@ -102,9 +103,11 @@ export function getSymbolInfo(lex: Lexer, mod?: Module, result_?: AhkSymbol[],
 				let code, since, message = warn.varisunset(v.name);
 				if (!k.decl && (since = inactiveVars[k.name.toUpperCase()]))
 					message += `, ${diagnostic.requireversion(since)}`, code = 'built-in library';
+				else if (!process.env.BROWSER && (since = missingIncludeInfo(lex, v.name)))
+					message = since, code = DiagnosticCode.missing_include;
 				lex.diagnostics.push({
 					code, message, range: v.selectionRange, severity: DiagnosticSeverity.Warning,
-					data: code ? undefined : { unset: v.name }
+					data: code === 'built-in library' ? undefined : { unset: v.name }
 				});
 			}
 		if (lex.actived) {

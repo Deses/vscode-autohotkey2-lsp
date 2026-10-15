@@ -79,6 +79,7 @@ export enum DiagnosticCode {
 	func_expr = 'function definition expressions',
 	include = 'include',
 	maybe_assign = 'maybe-assign',
+	missing_include = 'missing include',
 	module = 'module',
 	opt_chain = 'optional chaining',
 	typed_prop = 'typed properties',

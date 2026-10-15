@@ -13,6 +13,7 @@ import {
 	signatureProvider, symbolProvider, typeFormatting, updateConfig, utils, winapis, workspaceSymbolProvider
 } from './common';
 import { inlayHintProvider } from './inlayHintProvider';
+import { scheduleProjectDiagnostics } from './projectDiagnostics';
 
 export let connection: ProposedFeatures.Connection;
 export const documents = new TextDocuments(TextDocument);
@@ -89,9 +90,11 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 				event.removed.forEach(it => workspaceFolders.delete(it.uri.toLowerCase() + '/'));
 				event.added.forEach(it => workspaceFolders.add(it.uri.toLowerCase() + '/'));
 				setWorkspaceFolders(workspaceFolders);
+				scheduleProjectDiagnostics(1500);
 			});
 		}
 		isInitialized = true;
+		scheduleProjectDiagnostics(1500);
 		if (process.env.BROWSER) return;
 		utils.updateStatusBar?.(a_Vars.ahkpath ? undefined : '');
 		utils.getDllExport?.(['user32', 'kernel32', 'comctl32', 'gdi32'].map(name => `C:\\Windows\\System32\\${name}.dll`))
@@ -108,6 +111,7 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 		const { AutoLibInclude, InterpreterPath, Syntaxes } = configCache, prev = ahkVars;
 		updateConfig(newset);
 		setWorkspaceFolders(workspaceFolders);
+		scheduleProjectDiagnostics(1000);
 		if (process.env.BROWSER) return;
 		if (InterpreterPath !== configCache.InterpreterPath)
 			await utils.setInterpreter?.(resolvePath(configCache.InterpreterPath ??= ''));
@@ -135,17 +139,19 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 					lexers[c.uri.toLowerCase()]?.close(true);
 					break;
 			}
+		scheduleProjectDiagnostics(1500);
 	});
 
 	documents.listen(connection);
-	documents.onDidChangeContent(e => lexers[e.document.uri.toLowerCase()]?.update());
-	documents.onDidClose(e => lexers[e.document.uri.toLowerCase()]?.close());
+	documents.onDidChangeContent(e => (lexers[e.document.uri.toLowerCase()]?.update(), scheduleProjectDiagnostics()));
+	documents.onDidClose(e => (lexers[e.document.uri.toLowerCase()]?.close(), scheduleProjectDiagnostics(1500)));
 	documents.onDidOpen(e => {
 		const uri = e.document.uri.toLowerCase();
 		let lex = lexers[uri];
 		if (lex) lex.document = e.document;
 		else lexers[uri] = lex = new Lexer(e.document);
 		lex.actived = true;
+		scheduleProjectDiagnostics();
 		if (uri_switch_to_ahk2 === e.document.uri)
 			lex.actionwhenv1 = 'Continue';
 		if (process.env.BROWSER) return;

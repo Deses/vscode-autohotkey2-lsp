@@ -265,6 +265,12 @@
 					"default": 2,
 					"description": "%ahk2.files.scanmaxdepth%"
 				},
+				"AutoHotkey2.ProjectMissingIncludes": {
+					"scope": "window",
+					"type": "boolean",
+					"default": true,
+					"description": "%ahk2.projectmissingincludes%"
+				},
 				"AutoHotkey2.FormatOptions": {
 					"scope": "window",
 					"type": "object",

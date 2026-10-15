@@ -56,6 +56,12 @@ function check(graph: Graph) {
 }
 
 suite('Test include closure', () => {
+	suiteTeardown(() => {
+		for (const uri in lexers)
+			delete lexers[uri];
+		updateIncludeCache();
+	});
+
 	const shapes: Record<string, Graph> = {
 		chain: { a: ['b'], b: ['c'], c: [] },
 		diamond: { a: ['b', 'c'], b: ['d'], c: ['d'], d: [] },
