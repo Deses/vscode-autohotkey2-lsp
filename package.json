@@ -1,10 +1,10 @@
 {
-	"name": "vscode-autohotkey2-lsp",
-	"displayName": "AutoHotkey v2 Language Support",
-	"description": "AutoHotkey v2 Language Support, based on vscode-lsp.",
+	"name": "ahk2-lsp",
+	"displayName": "AutoHotkey v2 Language Support (Deses fork)",
+	"description": "AutoHotkey v2 Language Support, based on vscode-lsp. Fork of thqby's extension with a faster include closure.",
 	"author": "thqby",
-	"publisher": "thqby",
-	"version": "3.0.10",
+	"publisher": "deses",
+	"version": "3.0.10-deses.1",
 	"license": "LGPLv3.0",
 	"categories": [
 		"Formatters",
@@ -19,12 +19,12 @@
 	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/thqby/vscode-autohotkey2-lsp"
+		"url": "https://github.com/Deses/vscode-autohotkey2-lsp"
 	},
-	"homepage": "https://github.com/thqby/vscode-autohotkey2-lsp/blob/main/README.md",
+	"homepage": "https://github.com/Deses/vscode-autohotkey2-lsp/blob/main/README.md",
 	"icon": "icon.png",
 	"bugs": {
-		"url": "https://github.com/thqby/vscode-autohotkey2-lsp/issues"
+		"url": "https://github.com/Deses/vscode-autohotkey2-lsp/issues"
 	},
 	"engines": {
 		"vscode": "^1.82.0"
@@ -402,7 +402,7 @@
 		},
 		"configurationDefaults": {
 			"[ahk2]": {
-				"editor.defaultFormatter": "thqby.vscode-autohotkey2-lsp",
+				"editor.defaultFormatter": "deses.ahk2-lsp",
 				"editor.quickSuggestions": {
 					"other": true,
 					"comments": false,

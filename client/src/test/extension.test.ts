@@ -20,7 +20,7 @@ import {
 suite('Start ahk language server', () => {
 	test('should be running', async () => {
 		await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-		const client: LanguageClient = await vscode.extensions.getExtension('thqby.vscode-autohotkey2-lsp')?.activate();
+		const client: LanguageClient = await vscode.extensions.getExtension('deses.ahk2-lsp')?.activate();
 		assert.equal(client?.isRunning(), true);
 
 		suite('Open ahk file', () => {

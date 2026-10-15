@@ -2,6 +2,36 @@
 
 # AutoHotkey v2 Language Support
 
+> **Deses fork.** This is a fork of [thqby/vscode-autohotkey2-lsp](https://github.com/thqby/vscode-autohotkey2-lsp) (3.0.10 plus upstream PR #867). Everything below this section is the upstream README. Upstream changes are merged into the fork when they help.
+
+## Differences from upstream
+
+- **Include closure computed in one graph pass.** Upstream rebuilds `includeCache` and `includedCache` by recursing through the include graph and copying objects at every edge, which grows exponentially with shared includes. On a project whose entry script pulls in about 110 files, opening the entry script took 115 s; here it takes 0.7 s, and server memory drops from 730 MB to 360 MB. The old caches were also incomplete (on a corpus of five such projects, 631 entries were missing from the include closure and 7,312 from the reverse one); the new ones match a reference closure exactly. Code: `computeIncludeClosures` in `server/src/lexer2.ts`, tests in `server/src/test/includeClosure.test.ts`.
+- **File watcher covers `.ahk2` and `.ah2`.** Upstream only watched `*.ahk`, so changes on disk to other AHK v2 files that were not open in an editor never reached the server.
+- **Builds from a clean checkout.** TypeScript is bumped to 5.9.3 and `skipLibCheck` is on, so `npm run check-types` passes.
+- **Different extension id.** `deses.ahk2-lsp`, display name "AutoHotkey v2 Language Support (Deses fork)". Setting names (`AutoHotkey2.*`) are unchanged. It registers the same language and commands as upstream, so install only one of the two in a VS Code profile.
+
+Not changed on purpose: lexers are keyed by the path as written in the `#Include`, not by real path. Projects that share a library through a directory symlink and include host files relative to it (`#Include ..\..\types\X.ahk2`) rely on that.
+
+### Build and install
+
+```sh
+npm ci
+node esbuild.mjs
+npx vsce package
+code --install-extension ahk2-lsp-3.0.10-deses.1.vsix
+```
+
+### Merging upstream
+
+```sh
+git remote add upstream https://github.com/thqby/vscode-autohotkey2-lsp.git
+git fetch upstream
+git merge upstream/main
+```
+
+Conflicts are most likely in `server/src/lexer2.ts` (the include closure block) and `package.json` (name, publisher, version, `editor.defaultFormatter`). Run `npm run check-types` and `npm test` afterwards.
+
 [![installs](https://img.shields.io/visual-studio-marketplace/i/thqby.vscode-autohotkey2-lsp?label=Extension%20Install&style=for-the-badge&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=thqby.vscode-autohotkey2-lsp)
 [![version](https://img.shields.io/visual-studio-marketplace/v/thqby.vscode-autohotkey2-lsp?label=Extension%20Version&style=for-the-badge&logo=visualstudiocode)](https://marketplace.visualstudio.com/items?itemName=thqby.vscode-autohotkey2-lsp)
 [![](https://img.shields.io/badge/Compatibility-autohotkey%20v2.0+-green?style=for-the-badge&logo=autohotkey)](https://www.autohotkey.com/)
