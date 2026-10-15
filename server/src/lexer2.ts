@@ -1569,40 +1569,147 @@ export let includeCache: Record<string, Record<string, string>> = {};
 export let includedCache: Record<string, Record<string, string>> = {};
 export function updateIncludeCache() {
 	includeCache = {}, includedCache = {};
-	for (const lex of Object.values(lexers))
-		traverseInclude(lex);
+	computeIncludeClosures(Object.values(lexers));
 }
 
-export function traverseInclude(lex: Lexer, included?: Record<string, string>) {
-	const { uri, fsPath, include, is_virtual, module } = lex;
-	let hascache = true, u;
-	let cache = includeCache[uri] ??= (hascache = false, { [uri]: fsPath });
-	included = ((included ??= includedCache[uri])) ? { ...included } : {};
-	if (!is_virtual)
-		included[uri] ??= fsPath;
-	for (u in include) {
-		if (!(u in cache)) {
-			Object.assign(includedCache[u] ??= {}, included);
-			if (!(lex = lexers[u]))
-				continue;
-			if (hascache && (u in included)) {
-				cache[u] = included[u];
+export function traverseInclude(lex: Lexer) {
+	computeIncludeClosures([lex]);
+	return includeCache[lex.uri];
+}
+
+interface IncludeNode {
+	uri: string;
+	fsPath: string;
+	virtual: boolean;
+	include: Record<string, string>;
+	module: Lexer['module'];
+	succ: IncludeNode[];
+	pred: IncludeNode[];
+	unloaded: string[];
+	selfLoop: boolean;
+	index: number;
+	low: number;
+	onStack: boolean;
+	component: IncludeComponent;
+}
+
+interface IncludeComponent {
+	members: IncludeNode[];
+	cyclic: boolean;
+	closure: Record<string, string>;
+	ancestors: Record<string, string>;
+}
+
+function computeIncludeClosures(roots: Lexer[]) {
+	const nodes = new Map<string, IncludeNode>();
+	const queue: IncludeNode[] = [];
+	const addNode = (uri: string, fsPath: string, virtual: boolean, include: Record<string, string>, module?: Lexer['module']) => {
+		let node = nodes.get(uri);
+		if (!node) {
+			node = {
+				uri, fsPath, virtual, include, module, succ: [], pred: [], unloaded: [],
+				selfLoop: false, index: -1, low: 0, onStack: false
+			} as unknown as IncludeNode;
+			nodes.set(uri, node);
+			queue.push(node);
+		}
+		return node;
+	};
+
+	for (const lex of roots)
+		addNode(lex.uri, lex.fsPath, lex.is_virtual, lex.include, lex.module);
+	let node: IncludeNode | undefined, u: string;
+	while ((node = queue.pop())) {
+		for (const n in node.module)
+			addNode(`${node.uri}|${n}`, '', node.virtual, node.module[n].include);
+		for (u in node.include) {
+			const child = lexers[u];
+			if (!child) {
+				node.unloaded.push(u);
 				continue;
 			}
-			const c = traverseInclude(lex, included);
-			if (c[uri]) {
-				cache = includeCache[uri] = Object.assign(c, cache);
-			} else Object.assign(cache, c);
-		} else if (includedCache[u] ??= { ...included }, !(u in included) && (lex = lexers[u]))
-			traverseInclude(lex, included);
+			const target = addNode(child.uri, child.fsPath, child.is_virtual, child.include, child.module);
+			node.succ.push(target);
+			target.pred.push(node);
+			if (target === node)
+				node.selfLoop = true;
+		}
 	}
-	for (const n in module) {
-		u = `${uri}|${n}`;
-		(u in included) || traverseInclude({
-			uri: u, fsPath: '', is_virtual, include: module[n].include
-		} as Lexer);
+
+	const components: IncludeComponent[] = [];
+	const stack: IncludeNode[] = [];
+	let counter = 0;
+	for (const start of nodes.values()) {
+		if (start.index >= 0)
+			continue;
+		const work = [{ node: start, next: 0 }];
+		start.index = start.low = counter++, start.onStack = true, stack.push(start);
+		while (work.length) {
+			const frame = work[work.length - 1], current = frame.node;
+			if (frame.next < current.succ.length) {
+				const child = current.succ[frame.next++];
+				if (child.index < 0) {
+					child.index = child.low = counter++, child.onStack = true, stack.push(child);
+					work.push({ node: child, next: 0 });
+				} else if (child.onStack)
+					current.low = Math.min(current.low, child.index);
+				continue;
+			}
+			work.pop();
+			if (work.length) {
+				const parent = work[work.length - 1].node;
+				parent.low = Math.min(parent.low, current.low);
+			}
+			if (current.low !== current.index)
+				continue;
+			const members: IncludeNode[] = [];
+			let member: IncludeNode;
+			do {
+				member = stack.pop()!;
+				member.onStack = false;
+				members.push(member);
+			} while (member !== current);
+			const component: IncludeComponent = {
+				members, closure: {}, ancestors: {},
+				cyclic: members.length > 1 || current.selfLoop
+			};
+			for (member of members)
+				member.component = component;
+			for (member of members) {
+				component.closure[member.uri] = member.fsPath;
+				for (const next of member.succ)
+					if (next.component !== component)
+						Object.assign(component.closure, next.component.closure);
+			}
+			for (member of members)
+				includeCache[member.uri] = component.closure;
+			components.push(component);
+		}
 	}
-	return cache;
+
+	for (let i = components.length - 1; i >= 0; i--) {
+		const { members, cyclic, ancestors } = components[i];
+		for (const member of members) {
+			Object.assign(ancestors, includedCache[member.uri]);
+			for (const pred of member.pred)
+				if (pred.component !== components[i]) {
+					Object.assign(ancestors, pred.component.ancestors);
+					pred.virtual || (ancestors[pred.uri] ??= pred.fsPath);
+				}
+		}
+		if (cyclic)
+			for (const member of members)
+				member.virtual || (ancestors[member.uri] ??= member.fsPath);
+		if (Object.keys(ancestors).length)
+			for (const member of members)
+				Object.assign(includedCache[member.uri] ??= {}, ancestors);
+	}
+	for (node of nodes.values())
+		for (u of node.unloaded) {
+			const known = includedCache[u] ??= {};
+			Object.assign(known, node.component.ancestors);
+			node.virtual || (known[node.uri] ??= node.fsPath);
+		}
 }
 
 export function findLibrary(path: string, libdirs: string[], workdir: string = '', check_exists = false) {
