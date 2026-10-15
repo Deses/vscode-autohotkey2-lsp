@@ -1,7 +1,8 @@
 import { opendir } from 'fs/promises';
 import { CancellationToken, CodeAction, CodeActionParams, TextEdit } from 'vscode-languageserver';
 import { CodeActionKind, DiagnosticCode, DiagnosticTag, Maybe, TokenType, codeaction, configCache, lexers, restorePath } from './common';
-import { includeQuickFixes } from './includeActions';
+import { includeQuickFixes, resolveMissingIncludes } from './includeActions';
+import { organizeEdits } from './organizeIncludes';
 
 const words = ['catch', 'else', 'finally', 'until'];
 
@@ -56,8 +57,18 @@ export async function codeActionProvider(params: CodeActionParams, token: Cancel
 				break;
 		}
 	}
-	if (unsets.length && !process.env.BROWSER)
-		acts.push(...await includeQuickFixes(lex, unsets, uri));
+	if (!process.env.BROWSER) {
+		const missing = await resolveMissingIncludes(lex, unsets);
+		acts.push(...includeQuickFixes(lex, missing, uri));
+		if (!only || only.some(kind => CodeActionKind.SourceOrganizeImports.startsWith(kind))) {
+			const add = [...new Set([...missing.values()].filter(m => m.paths.length === 1).map(m => m.paths[0]))];
+			const edits = organizeEdits(lex, add);
+			edits.length && acts.push({
+				kind: CodeActionKind.SourceOrganizeImports, title: codeaction.organizeincludes(),
+				edit: { changes: { [uri]: edits } }
+			});
+		}
+	}
 	for (const [k, v] of Object.entries(replaces))
 		acts.push({
 			kind: CodeActionKind.QuickFix,

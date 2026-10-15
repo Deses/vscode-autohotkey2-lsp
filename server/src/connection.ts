@@ -31,7 +31,7 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 		const result: InitializeResult = {
 			serverInfo: { name: 'ahk2-language-server', },
 			capabilities: {
-				codeActionProvider: true,
+				codeActionProvider: { codeActionKinds: ['quickfix', 'refactor.rewrite', 'source.organizeImports'] },
 				colorProvider: true,
 				completionProvider: { resolveProvider: false, triggerCharacters: `.#*@'"`.split('') },
 				definitionProvider: true,

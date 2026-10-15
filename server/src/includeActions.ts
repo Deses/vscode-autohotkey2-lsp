@@ -63,18 +63,31 @@ export function includeInsertion(lex: Lexer, paths: string[]): { edit: TextEdit,
 	return { edit: TextEdit.insert({ line, character: 0 }, (previous ? '\n' : '') + texts.join('\n') + '\n\n'), texts };
 }
 
-export async function includeQuickFixes(lex: Lexer, diagnostics: Diagnostic[], uri: string): Promise<CodeAction[]> {
-	const names = new Map<string, Diagnostic>();
+export interface MissingInclude {
+	diagnostic: Diagnostic;
+	paths: string[];
+}
+
+export async function resolveMissingIncludes(lex: Lexer, diagnostics: Diagnostic[]) {
+	const names = new Map<string, MissingInclude>();
 	for (const d of diagnostics)
-		names.has(d.data.unset.toUpperCase()) || names.set(d.data.unset.toUpperCase(), d);
+		names.has(d.data.unset.toUpperCase()) || names.set(d.data.unset.toUpperCase(), { diagnostic: d, paths: [] });
+	if (!names.size)
+		return names;
 	await scanProject(lex);
-	const acts: CodeAction[] = [], unique: string[] = [];
-	for (const [upper, diagnostic] of names) {
-		let paths = findDefiningFiles(lex, upper);
-		if (!paths.length) {
+	for (const [upper, missing] of names) {
+		missing.paths = findDefiningFiles(lex, upper);
+		if (!missing.paths.length) {
 			await scanProject(lex, true);
-			paths = findDefiningFiles(lex, upper);
+			missing.paths = findDefiningFiles(lex, upper);
 		}
+	}
+	return names;
+}
+
+export function includeQuickFixes(lex: Lexer, names: Map<string, MissingInclude>, uri: string): CodeAction[] {
+	const acts: CodeAction[] = [], unique: string[] = [];
+	for (const { diagnostic, paths } of names.values()) {
 		paths.length === 1 && unique.push(paths[0]);
 		for (const path of paths.slice(0, 5)) {
 			const { edit, texts } = includeInsertion(lex, [path]);
