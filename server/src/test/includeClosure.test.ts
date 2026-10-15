@@ -1,6 +1,7 @@
 import assert from 'assert';
 import { lexers } from '../common';
-import type { Lexer } from '../lexer';
+import { TextDocument } from 'vscode-languageserver-textdocument';
+import { Lexer } from '../lexer';
 import { includeCache, includedCache, traverseInclude, updateIncludeCache } from '../lexer2';
 
 type Graph = Record<string, string[]>;
@@ -97,6 +98,23 @@ suite('Test include closure', () => {
 		assert.deepEqual(entries(includeCache.a), [['a', 'a.ahk']]);
 		assert.deepEqual(entries(includeCache['a|m']), [['a|m', ''], ['b', 'b.ahk']]);
 		assert.deepEqual(entries(includedCache.b), [['a|m', '']]);
+	});
+
+	test('relevance follows include changes and honors explicit context', () => {
+		const graph: Graph = { a: ['b'], b: [], c: [], d: ['a'] };
+		load(graph);
+		const lex = new Lexer(TextDocument.create('a', 'ahk2', 1, ''));
+		lex.uri = 'a', lex.fsPath = 'a.ahk', lex.include = toIncludes(graph.a);
+		lexers.a = lex;
+		updateIncludeCache();
+		assert.deepEqual(Object.keys(lex.getRelevance(true)).sort(), ['b']);
+		assert.deepEqual(Object.keys(lex.getRelevance(false)).sort(), ['b', 'd']);
+		graph.b = ['c'];
+		lexers.b.include = toIncludes(graph.b);
+		traverseInclude(lexers.b);
+		traverseInclude(lex);
+		assert.deepEqual(Object.keys(lex.getRelevance(true)).sort(), ['b', 'c']);
+		assert.deepEqual(Object.keys(lex.getRelevance(false, true)).sort(), ['a', 'b', 'c', 'd']);
 	});
 
 	test('layered graph with 5^40 paths finishes quickly', () => {

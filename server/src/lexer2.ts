@@ -1567,6 +1567,10 @@ export function matchTypes(target: (string | AhkSymbol)[], expr_tp: AhkSymbol[])
 //#region library
 export let includeCache: Record<string, Record<string, string>> = {};
 export let includedCache: Record<string, Record<string, string>> = {};
+export let includeVersion = 0;
+export function bumpIncludeVersion() {
+	includeVersion++;
+}
 export function updateIncludeCache() {
 	includeCache = {}, includedCache = {};
 	computeIncludeClosures(Object.values(lexers));
@@ -1710,6 +1714,7 @@ function computeIncludeClosures(roots: Lexer[]) {
 			Object.assign(known, node.component.ancestors);
 			node.virtual || (known[node.uri] ??= node.fsPath);
 		}
+	includeVersion++;
 }
 
 export function findLibrary(path: string, libdirs: string[], workdir: string = '', check_exists = false) {

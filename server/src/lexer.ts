@@ -14,7 +14,7 @@ import {
 	symbolProvider, URI, utils, warn, workspaceFolders
 } from './common';
 import {
-	findLibrary, findSymbol, getClassBase, getParamCount, includeCache, includedCache,
+	bumpIncludeVersion, findLibrary, findSymbol, getClassBase, getParamCount, includeCache, includedCache, includeVersion,
 	joinTypes, resolveFuncType, resolveImports, resolveTypeAnnotation, traverseInclude, typeNaming, updateIncludeCache
 } from './lexer2';
 import { DiagnosticSeverity, DiagnosticTag, MessageType, SymbolKind } from './lsp-enums';
@@ -172,6 +172,7 @@ export class Lexer implements Module {
 	dllpaths: string[] = [];
 	document: TextDocument;
 	explicitContext?: boolean;
+	private relevanceCache?: { version: number, values: Record<string, string>[] };
 	findToken: (offset: number, ignore?: boolean) => Token;
 	folding_ranges: FoldingRange[] = [];
 	fsPath = '';
@@ -6569,8 +6570,17 @@ export class Lexer implements Module {
 	get relevance() { return this.getRelevance(); }
 
 	getRelevance(explicitContext?: boolean, include_self = false) {
+		const explicit = !!(explicitContext ?? this.explicitContext ?? configCache.ExplicitContextOnly);
+		const key = (explicit ? 1 : 0) | (include_self ? 2 : 0);
+		let cache = this.relevanceCache;
+		if (cache?.version !== includeVersion)
+			cache = this.relevanceCache = { version: includeVersion, values: [] };
+		return { ...(cache.values[key] ??= this.computeRelevance(explicit, include_self)) };
+	}
+
+	private computeRelevance(explicit: boolean, include_self: boolean) {
 		const uri = this.uri, r = { ...includeCache[uri] };
-		if (!(explicitContext ?? this.explicitContext ?? configCache.ExplicitContextOnly)) {
+		if (!explicit) {
 			for (const u in includedCache[uri])
 				Object.assign(r, includeCache[u]);
 			Object.assign(r, includedCache[uri]);
@@ -7001,6 +7011,7 @@ export class Lexer implements Module {
 				})))
 					arr.push(includedCache[u]), delete includedCache[u];
 				included = Object.assign({}, included, ...arr);
+				bumpIncludeVersion();
 			}
 			if (flags & 10)
 				removed = difference(removed, added)?.removed;
@@ -7019,6 +7030,7 @@ export class Lexer implements Module {
 			} else included ??= this.included;
 			for (u in included)
 				(u = includeCache[u]) && Object.assign(u, c);
+			bumpIncludeVersion();
 			if (process.env.DEBUG) {
 				for (const lex of Object.values(lexers)) {
 					lex.actived && console.log(['>>> file: ' + lex.fsPath,
@@ -7132,6 +7144,7 @@ export class Lexer implements Module {
 			const { uri, module } = lex;
 			delete cache[uri];
 			Object.keys(module ?? {}).forEach(s => delete cache[`${uri}|${s}`]);
+			bumpIncludeVersion();
 		}
 	}
 
