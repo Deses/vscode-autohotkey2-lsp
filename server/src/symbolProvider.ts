@@ -102,7 +102,10 @@ export function getSymbolInfo(lex: Lexer, mod?: Module, result_?: AhkSymbol[],
 				let code, since, message = warn.varisunset(v.name);
 				if (!k.decl && (since = inactiveVars[k.name.toUpperCase()]))
 					message += `, ${diagnostic.requireversion(since)}`, code = 'built-in library';
-				lex.diagnostics.push({ code, message, range: v.selectionRange, severity: DiagnosticSeverity.Warning });
+				lex.diagnostics.push({
+					code, message, range: v.selectionRange, severity: DiagnosticSeverity.Warning,
+					data: code ? undefined : { unset: v.name }
+				});
 			}
 		if (lex.actived) {
 			checksamename(lex, mod);

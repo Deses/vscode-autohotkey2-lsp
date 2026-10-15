@@ -15,6 +15,8 @@ export const completionitem = {
 }
 
 export const codeaction = {
+	addinclude: localize('codeaction.addinclude', 'Add \'#Include {0}\''),
+	addincludes: localize('codeaction.addincludes', 'Add {0} missing includes'),
 	brace: localize('codeaction.brace', 'Convert to code block with braces'),
 	include: localize('codeaction.include', 'Batch include \'{0}\''),
 	parenthesized: localize('codeaction.parenthesized', 'Convert to parenthesized call style'),

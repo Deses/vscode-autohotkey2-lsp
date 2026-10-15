@@ -1,6 +1,7 @@
 import { opendir } from 'fs/promises';
 import { CancellationToken, CodeAction, CodeActionParams, TextEdit } from 'vscode-languageserver';
 import { CodeActionKind, DiagnosticCode, DiagnosticTag, Maybe, TokenType, codeaction, configCache, lexers, restorePath } from './common';
+import { includeQuickFixes } from './includeActions';
 
 const words = ['catch', 'else', 'finally', 'until'];
 
@@ -12,9 +13,11 @@ export async function codeActionProvider(params: CodeActionParams, token: Cancel
 	const acts: CodeAction[] = [], replaces: Record<string, TextEdit[]> = {},
 		parens: TextEdit[] = [], unuseds: TextEdit[] = [];
 	const has_refactor = only?.toString().includes(CodeActionKind.Refactor) !== false;
+	const unsets: typeof diagnostics = [];
 	let m, text: string | undefined;
 
 	for (const it of diagnostics) {
+		it.data?.unset && unsets.push(it);
 		switch (it.code) {
 			case DiagnosticCode.call:
 				if (has_refactor) {
@@ -53,6 +56,8 @@ export async function codeActionProvider(params: CodeActionParams, token: Cancel
 				break;
 		}
 	}
+	if (unsets.length && !process.env.BROWSER)
+		acts.push(...await includeQuickFixes(lex, unsets, uri));
 	for (const [k, v] of Object.entries(replaces))
 		acts.push({
 			kind: CodeActionKind.QuickFix,

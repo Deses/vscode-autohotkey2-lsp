@@ -625,7 +625,7 @@ export function parseInclude(lex: Lexer, dir: string, _set = new Set()) {
 	}
 }
 
-export async function parseProject(uri: string) {
+export async function parseProject(uri: string, delay = 50) {
 	let lex = lexers[uri];
 	if (!lex || !uri.startsWith('file:'))
 		return;
@@ -645,7 +645,7 @@ export async function parseProject(uri: string) {
 				}
 			}
 			libSymbols[uri] = getLibSymbols(lex);
-			await sleep(50);
+			await sleep(delay);
 		}
 	}
 }
