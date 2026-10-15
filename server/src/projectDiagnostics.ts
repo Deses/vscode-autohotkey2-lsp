@@ -37,20 +37,19 @@ async function clearPublished() {
 
 async function publishMissingIncludes() {
 	const checked = new Map<string, Diagnostic[]>();
-	for (const folder of workspaceFolders) {
-		const uris: string[] = [];
+	const uris: string[] = [];
+	for (const folder of workspaceFolders)
 		await parseFolder(URI.parse(folder).fsPath, true, 0, Infinity, uri => uris.push(uri));
-		for (const uri of uris) {
-			const lex = lexers[uri];
-			if (!lex || lex.d || lex.actived || checked.has(lex.uri))
-				continue;
-			lex.parseScript();
-			symbolProvider({ textDocument: { uri: lex.document.uri } });
-			const names = new Set<string>();
-			checked.set(lex.uri, lex.diagnostics.filter(d => d.code === DiagnosticCode.missing_include &&
-				!names.has(d.data.unset.toUpperCase()) && names.add(d.data.unset.toUpperCase())));
-			await sleep(0);
-		}
+	for (const uri of uris) {
+		const lex = lexers[uri];
+		if (!lex || lex.d || lex.actived || checked.has(lex.uri))
+			continue;
+		lex.parseScript();
+		symbolProvider({ textDocument: { uri: lex.document.uri } });
+		const names = new Set<string>();
+		checked.set(lex.uri, lex.diagnostics.filter(d => d.code === DiagnosticCode.missing_include &&
+			!names.has(d.data.unset.toUpperCase()) && names.add(d.data.unset.toUpperCase())));
+		await sleep(0);
 	}
 	for (const [uri, diagnostics] of checked) {
 		const lex = lexers[uri];

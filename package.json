@@ -271,6 +271,12 @@
 					"default": true,
 					"description": "%ahk2.projectmissingincludes%"
 				},
+				"AutoHotkey2.MountedAt": {
+					"scope": "resource",
+					"type": "string",
+					"default": "",
+					"description": "%ahk2.mountedat%"
+				},
 				"AutoHotkey2.FormatOptions": {
 					"scope": "window",
 					"type": "object",

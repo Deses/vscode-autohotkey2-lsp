@@ -10,7 +10,7 @@ import { TextDocument } from 'vscode-languageserver-textdocument';
 import {
 	a_Vars, action, ahkUris, ahkVars, builtinCommands_v1, commentTags, configCache,
 	diagnostic, difference, hint, hoverCache, inactiveVars, invokeCheck, isahk2_h, lexers, libDirs,
-	libSymbols, locale, Mode, parseInclude, restorePath, rootDir,
+	libSymbols, locale, Mode, mountedUri, parseInclude, restorePath, rootDir,
 	symbolProvider, URI, utils, warn, workspaceFolders
 } from './common';
 import {
@@ -211,7 +211,7 @@ export class Lexer implements Module {
 		let n_newlines: number, parser_pos: number, sharp_offsets: number[];
 		let customblocks: { region: number[], bracket: number[] };
 		// eslint-disable-next-line @typescript-eslint/no-this-alias
-		const _this = this, uri = URI.parse(document.uri);
+		const _this = this, mounted = mountedUri(document.uri), uri = URI.parse(mounted);
 		let allow_$ = true, block_mode = true, format_mode = false, h = isahk2_h;
 		let in_loop = false, string_mode = false;
 		let warn_once: Record<string, unknown>, mixes: [AhkSymbol, string][];
@@ -221,7 +221,7 @@ export class Lexer implements Module {
 		this.document = document;
 		if (document.uri) {
 			allow_$ = false;
-			this.uri = document.uri.toLowerCase();
+			this.uri = mounted.toLowerCase();
 			this.setWorkspaceFolder();
 			this.scriptpath = (this.fsPath = uri.fsPath).replace(/[\\/][^\\/]+$/, '');
 			this.initLibDirs(scriptdir);
@@ -6566,11 +6566,12 @@ export class Lexer implements Module {
 			this.module = this.st = this.symbolInformation = this.winapi = undefined!;
 	}
 
+	get mounted() { return mountedUri(this.document.uri) !== this.document.uri; }
 	get included() { return includedCache[this.uri] ?? {}; }
 	get relevance() { return this.getRelevance(); }
 
 	getRelevance(explicitContext?: boolean, include_self = false) {
-		const explicit = !!(explicitContext ?? this.explicitContext ?? configCache.ExplicitContextOnly);
+		const explicit = !!(explicitContext ?? this.explicitContext ?? (!this.mounted && configCache.ExplicitContextOnly));
 		const key = (explicit ? 1 : 0) | (include_self ? 2 : 0);
 		let cache = this.relevanceCache;
 		if (cache?.version !== includeVersion)

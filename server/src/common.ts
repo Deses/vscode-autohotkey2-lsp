@@ -6,6 +6,7 @@ import { CompletionItem, Diagnostic, Hover, InsertTextFormat, MessageActionItem 
 import { TextDocument } from 'vscode-languageserver-textdocument';
 import { URI } from 'vscode-uri';
 import { jsDocTagNames } from './constants';
+import { hasMounts, mountedKey } from './mounts';
 import { Lexer, ZERO_RANGE, ahkModule, fixupFormatOptions, traverseInclude } from './lexer';
 import { diagnostic, setting } from './localize';
 import { CompletionItemKind, MessageType, SymbolKind } from './lsp-enums';
@@ -21,6 +22,7 @@ export * from './hoverProvider';
 export * from './lexer';
 export * from './lexer2';
 export * from './localize';
+export * from './mounts';
 export * from './lsp-enums';
 export * from './referencesProvider';
 export * from './renameProvider';
@@ -97,7 +99,12 @@ interface Utils {
 }
 
 export const winapis: string[] = [];
-export const lexers: Record<string, Lexer> = {};
+export const lexers: Record<string, Lexer> = new Proxy<Record<string, Lexer>>({}, {
+	get: (target, key) => target[typeof key === 'string' ? mountedKey(key) : key as never],
+	set: (target, key, value) => (target[typeof key === 'string' ? mountedKey(key) : key as never] = value, true),
+	has: (target, key) => (typeof key === 'string' ? mountedKey(key) : key) in target,
+	deleteProperty: (target, key) => delete target[typeof key === 'string' ? mountedKey(key) : key as never]
+});
 export const configCache: LSConfig = {
 	ActionWhenV1IsDetected: 'Warn',
 	AutoLibInclude: 0,
@@ -643,6 +650,9 @@ export async function parseFolder(searchdir: string, workspace: boolean, delay =
 	for await (const path of enumFiles(searchdir, undefined, maxdepth)) {
 		const uri = URI.file(path).toString().toLowerCase();
 		onFile?.(uri);
+		if (hasMounts() && (lex = lexers[uri]) && !lex.actived && lex.document.uri.toLowerCase() !== uri &&
+			(t = openFile(path, false)))
+			lex.document = t;
 		if (!libSymbols[uri]) {
 			if (!(lex = lexers[uri])) {
 				if (!(t = openFile(path)) || (lex = new Lexer(t)).d || (lex.parseScript(), lex.maybev1))

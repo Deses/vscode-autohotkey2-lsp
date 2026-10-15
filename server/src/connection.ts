@@ -7,10 +7,10 @@ import {
 	a_Vars, ahkVars, chinesePunctuations, codeActionProvider, colorPresentation,
 	colorProvider, completionProvider, configCache, defintionProvider, documentFormatting, enumNames,
 	fullySemanticToken, getRequestHandlers, hoverProvider, initCaches, initLocalize, isahk2_h, Lexer, lexers,
-	loadSyntax, LSConfig, MessageType, parseProject, parseUserLib, prepareRename, rangeFormatting,
+	loadSyntax, LSConfig, MessageType, mountedUri, parseProject, parseUserLib, prepareRename, rangeFormatting,
 	readTextFile, referenceProvider, renameProvider, resolvePath, SemanticTokenModifiers, semanticTokensOnFull,
-	semanticTokensOnRange, SemanticTokenTypes, setIsAhkH, setLocale, setRootDir, setWorkspaceFolders,
-	signatureProvider, symbolProvider, typeFormatting, updateConfig, utils, winapis, workspaceSymbolProvider
+	semanticTokensOnRange, SemanticTokenTypes, setIsAhkH, setLocale, setMounts, setRootDir, setWorkspaceFolders,
+	signatureProvider, symbolProvider, typeFormatting, updateConfig, URI, utils, winapis, workspaceSymbolProvider
 } from './common';
 import { inlayHintProvider } from './inlayHintProvider';
 import { scheduleProjectDiagnostics } from './projectDiagnostics';
@@ -18,6 +18,7 @@ import { scheduleProjectDiagnostics } from './projectDiagnostics';
 export let connection: ProposedFeatures.Connection;
 export const documents = new TextDocuments(TextDocument);
 const workspaceFolders = new Set<string>();
+const folderUris = new Map<string, string>();
 let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
 export let isInitialized = false;
@@ -58,7 +59,7 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 		hasConfigurationCapability = !!capabilities.workspace?.configuration;
 		hasWorkspaceFolderCapability = !!capabilities.workspace?.workspaceFolders;
 		if (hasWorkspaceFolderCapability) {
-			params.workspaceFolders?.forEach(it => workspaceFolders.add(it.uri.toLowerCase() + '/'));
+			params.workspaceFolders?.forEach(it => addFolder(it.uri));
 			result.capabilities.workspace = { workspaceFolders: { supported: true } };
 		}
 
@@ -87,14 +88,14 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 			connection.client.register(DidChangeConfigurationNotification.type);
 		if (hasWorkspaceFolderCapability) {
 			connection.workspace.onDidChangeWorkspaceFolders(event => {
-				event.removed.forEach(it => workspaceFolders.delete(it.uri.toLowerCase() + '/'));
-				event.added.forEach(it => workspaceFolders.add(it.uri.toLowerCase() + '/'));
+				event.removed.forEach(it => removeFolder(it.uri));
+				event.added.forEach(it => addFolder(it.uri));
 				setWorkspaceFolders(workspaceFolders);
-				scheduleProjectDiagnostics(1500);
+				loadMounts().then(() => scheduleProjectDiagnostics(1500));
 			});
 		}
 		isInitialized = true;
-		scheduleProjectDiagnostics(1500);
+		loadMounts().then(() => scheduleProjectDiagnostics(1500));
 		if (process.env.BROWSER) return;
 		utils.updateStatusBar?.(a_Vars.ahkpath ? undefined : '');
 		utils.getDllExport?.(['user32', 'kernel32', 'comctl32', 'gdi32'].map(name => `C:\\Windows\\System32\\${name}.dll`))
@@ -111,7 +112,7 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 		const { AutoLibInclude, InterpreterPath, Syntaxes } = configCache, prev = ahkVars;
 		updateConfig(newset);
 		setWorkspaceFolders(workspaceFolders);
-		scheduleProjectDiagnostics(1000);
+		loadMounts().then(() => scheduleProjectDiagnostics(1000));
 		if (process.env.BROWSER) return;
 		if (InterpreterPath !== configCache.InterpreterPath)
 			await utils.setInterpreter?.(resolvePath(configCache.InterpreterPath ??= ''));
@@ -145,21 +146,7 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 	documents.listen(connection);
 	documents.onDidChangeContent(e => (lexers[e.document.uri.toLowerCase()]?.update(), scheduleProjectDiagnostics()));
 	documents.onDidClose(e => (lexers[e.document.uri.toLowerCase()]?.close(), scheduleProjectDiagnostics(1500)));
-	documents.onDidOpen(e => {
-		const uri = e.document.uri.toLowerCase();
-		let lex = lexers[uri];
-		if (lex) lex.document = e.document;
-		else lexers[uri] = lex = new Lexer(e.document);
-		lex.actived = true;
-		scheduleProjectDiagnostics();
-		if (uri_switch_to_ahk2 === e.document.uri)
-			lex.actionwhenv1 = 'Continue';
-		if (process.env.BROWSER) return;
-		Object.defineProperty(lex.include, '', { value: '', enumerable: false });
-		if (configCache.AutoLibInclude & 1)
-			parseProject(uri).then(() => lex.last_diags &&
-				Object.keys(lex.included).length && lex.update());
-	});
+	documents.onDidOpen(e => openDocument(e.document));
 
 	connection.languages.inlayHint.on(inlayHintProvider);
 	connection.languages.semanticTokens.on(semanticTokensOnFull);
@@ -195,6 +182,52 @@ export function setConnection(conn: ProposedFeatures.Connection, extensionUri = 
 		showMessage,
 	});
 	connection.listen();
+}
+
+function openDocument(document: TextDocument) {
+	const uri = document.uri.toLowerCase();
+	let lex = lexers[uri];
+	if (lex) lex.document = document;
+	else lexers[uri] = lex = new Lexer(document);
+	lex.actived = true;
+	scheduleProjectDiagnostics();
+	if (uri_switch_to_ahk2 === document.uri)
+		lex.actionwhenv1 = 'Continue';
+	if (process.env.BROWSER) return;
+	Object.defineProperty(lex.include, '', { value: '', enumerable: false });
+	if (configCache.AutoLibInclude & 1)
+		parseProject(uri).then(() => lex.last_diags &&
+			Object.keys(lex.included).length && lex.update());
+}
+
+function addFolder(uri: string) {
+	const key = uri.toLowerCase() + '/';
+	workspaceFolders.add(key);
+	folderUris.set(key, uri);
+}
+
+function removeFolder(uri: string) {
+	const key = uri.toLowerCase() + '/';
+	workspaceFolders.delete(key);
+	folderUris.delete(key);
+}
+
+async function loadMounts() {
+	if (process.env.BROWSER || !hasConfigurationCapability)
+		return;
+	const folders = [...folderUris.values()];
+	const values: (string | null | undefined)[] = await connection.workspace.getConfiguration(
+		folders.map(scopeUri => ({ scopeUri, section: 'AutoHotkey2.MountedAt' })));
+	if (!setMounts(folders.map((uri, i) => ({ folder: URI.parse(uri).fsPath, mountedAt: values[i] ?? '' }))))
+		return;
+	const open = new Set<TextDocument>();
+	for (const lex of new Set(Object.values(lexers))) {
+		if (mountedUri(lex.document.uri).toLowerCase() === lex.uri)
+			continue;
+		lex.actived && open.add(lex.document);
+		lex.close(true);
+	}
+	open.forEach(openDocument);
 }
 
 function sendDiagnostics(uri: string, diagnostics = []) {

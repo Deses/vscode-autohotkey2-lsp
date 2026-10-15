@@ -25,6 +25,7 @@
 	"ahk2.warn.callwithoutparentheses": "Display warnings for each function or method call without parentheses",
 	"ahk2.files.exclude": "Configure glob patterns for excluding files and folders when scanning ahk files.",
 	"ahk2.files.scanmaxdepth": "Controls the depth when scanning ahk files.",
+	"ahk2.mountedat": "Set in a folder's own settings. Path, relative to that folder, of where this folder appears inside a host project (for example `../ZZZ-Automaton/app/commons` for a shared library that every game mounts as `app\\commons`). Files of this folder are then analysed as if they lived there, so includes and symbols provided by the host resolve.",
 	"ahk2.projectmissingincludes": "Report missing `#Include` lines in the Problems panel for every AutoHotkey file in the workspace folders, not only for open files. A file is checked against what its own includes provide, so this works best together with `ExplicitContextOnly`.",
 	"ahk2.generate.comment": "Generate Comment Template",
 	"ahk2.help": "Quick Help",
