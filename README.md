@@ -27,7 +27,7 @@ Not changed on purpose: lexers are keyed by the path as written in the `#Include
 npm ci
 node esbuild.mjs
 npx vsce package
-code --install-extension ahk2-lsp-3.1.0-deses.1.vsix
+code --install-extension ahk2-lsp-3.1.1-deses.1.vsix
 ```
 
 ### Merging upstream
