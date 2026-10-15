@@ -7051,10 +7051,10 @@ export class Lexer implements Module {
 		this.sendDiagnostics(true, true);
 	}
 
-	clearDiagnostics() {
+	clearDiagnostics(forget = true) {
 		if (!this.last_diags)
 			return;
-		this.include = {}, this.diagnostics = [], this.last_diags = 0;
+		forget && (this.include = {}), this.diagnostics = [], this.last_diags = 0;
 		utils.sendDiagnostics?.(this.document.uri, []);
 	}
 
@@ -7120,7 +7120,7 @@ export class Lexer implements Module {
 		if (!force && (visted.get(this) ?? this.keepAlive(visted)))
 			return;
 		delete this.diag_timer;
-		this.clearDiagnostics();
+		this.clearDiagnostics(force || !this.workspaceFolder);
 		if (force || !this.workspaceFolder) {
 			visted.set(this, 0);
 			this.importLex?.forEach(l => l.importedLex?.delete(this));
