@@ -2,12 +2,19 @@ import { Range, TextEdit } from 'vscode-languageserver';
 import { includeInsertion } from './includeActions';
 import type { Lexer } from './lexer';
 
-const includeLine = /^(\s*)#Include(\s+\*i)?\s+([^;\r\n]*?)\s*(\s;.*)?$/i;
+export const includeLine = /^(\s*)#Include(\s+\*i)?\s+([^;\r\n]*?)\s*(\s;.*)?$/i;
+
+interface IncludeEntry {
+	text: string;
+	path: string;
+	skip: string;
+	line: number;
+}
 
 interface IncludeBlock {
 	indent: string;
 	start: number;
-	lines: { text: string, path: string, skip: string }[];
+	lines: IncludeEntry[];
 }
 
 function sortKey(path: string) {
@@ -22,7 +29,7 @@ function compareKeys(a: string[], b: string[]) {
 	return a.length - b.length;
 }
 
-function isFileInclude(path: string) {
+export function isFileInclude(path: string) {
 	return /\.(ahk2?|ah2)$/i.test(path) || path.startsWith('<') && path.endsWith('>');
 }
 
@@ -37,37 +44,39 @@ function findBlocks(lines: string[]) {
 		}
 		if (!block || block.indent !== m[1])
 			blocks.push(block = { indent: m[1], start: i, lines: [] });
-		block.lines.push({ text: line, path: m[3], skip: (m[2] ?? '').trim() });
+		block.lines.push({ text: line, path: m[3], skip: (m[2] ?? '').trim(), line: i });
 	});
 	return blocks;
 }
 
-export function organizeEdits(lex: Lexer, addPaths: string[]): TextEdit[] {
+export function organizeEdits(lex: Lexer, addPaths: string[], remove = new Set<number>()): TextEdit[] {
 	const text = lex.document.getText();
 	const eol = text.includes('\r\n') ? '\r\n' : '\n';
 	const lines = text.split(/\r?\n/);
 	const blocks = findBlocks(lines);
 	if (!blocks.length)
 		return addPaths.length ? [includeInsertion(lex, addPaths).edit] : [];
-	if (addPaths.length) {
-		const last = blocks[blocks.length - 1];
+	const last = blocks[blocks.length - 1];
+	const originalCounts = new Map(blocks.map(b => [b, b.lines.length]));
+	if (addPaths.length)
 		for (const added of includeInsertion(lex, addPaths).texts)
-			last.lines.push({ text: last.indent + added, path: added.replace(/^#Include\s+/, ''), skip: '' });
-	}
+			last.lines.push({ text: last.indent + added, path: added.replace(/^#Include\s+/, ''), skip: '', line: -1 });
 	const edits: TextEdit[] = [];
 	for (const block of blocks) {
 		const seen = new Set<string>();
 		const unique = block.lines.filter(l => {
 			const id = `${l.skip}|${l.path.toLowerCase().replaceAll('/', '\\')}`;
-			return !seen.has(id) && seen.add(id);
+			return !remove.has(l.line) && !seen.has(id) && seen.add(id);
 		});
 		const sorted = unique.map((l, i) => ({ l, key: sortKey(l.path), i }))
 			.sort((a, b) => compareKeys(a.key, b.key) || a.i - b.i).map(x => x.l.text);
-		const original = lines.slice(block.start, block.start + block.lines.length - (addPaths.length && block === blocks[blocks.length - 1] ? addPaths.length : 0));
+		const original = lines.slice(block.start, block.start + originalCounts.get(block)!);
 		if (sorted.join(eol) === original.join(eol))
 			continue;
 		const endLine = block.start + original.length - 1;
-		edits.push(TextEdit.replace(Range.create(block.start, 0, endLine, lines[endLine].length), sorted.join(eol)));
+		if (!sorted.length && endLine + 1 < lines.length)
+			edits.push(TextEdit.del(Range.create(block.start, 0, endLine + 1, 0)));
+		else edits.push(TextEdit.replace(Range.create(block.start, 0, endLine, lines[endLine].length), sorted.join(eol)));
 	}
 	return edits;
 }
