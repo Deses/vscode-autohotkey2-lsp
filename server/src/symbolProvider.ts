@@ -17,16 +17,6 @@ export function symbolProvider(params: DocumentSymbolParams, token?: Cancellatio
 	return lex.symbolInformation ?? getSymbolInfo(lex) ?? [];
 }
 
-function assignedByIncluder(lex: Lexer, name: string) {
-	const key = name.toUpperCase();
-	for (const uri in lex.included) {
-		const sym = lexers[uri]?.declaration[key];
-		if (sym?.kind === SymbolKind.Variable && (sym as Variable).assigned)
-			return true;
-	}
-	return false;
-}
-
 export function getSymbolInfo(lex: Lexer, mod?: Module, result_?: AhkSymbol[],
 	oncomp?: Array<() => Maybe<() => void>>, caches = new Map<ClassNode, Record<string, AhkSymbol>>()) {
 	const fns = oncomp ?? [];
@@ -49,6 +39,18 @@ export function getSymbolInfo(lex: Lexer, mod?: Module, result_?: AhkSymbol[],
 				gvar[k] = dec[k];
 			else if (t.kind === SymbolKind.Variable && (t.assigned ||= (dec[k] as Variable).assigned, dec[k].def))
 				t.def ??= false;
+		}
+	}
+	for (const uri in lex.included) {
+		const dec = lexers[uri]?.declaration;
+		for (const k in dec) {
+			const t = gvar[k], v = dec[k];
+			if (v.kind !== SymbolKind.Variable || !(v as Variable).assigned)
+				continue;
+			if (!t)
+				gvar[k] = v as Variable;
+			else if (t.kind === SymbolKind.Variable)
+				t.assigned = true;
 		}
 	}
 	let implicitVars;
@@ -109,7 +111,7 @@ export function getSymbolInfo(lex: Lexer, mod?: Module, result_?: AhkSymbol[],
 		if (configCache.Warn?.VarUnset) {
 			const provided = hostNames(document);
 			for (const [k, v] of unset_vars) {
-				if (k.assigned || k.has_warned || provided.has(v.name.toUpperCase()) || assignedByIncluder(lex, v.name))
+				if (k.assigned || k.has_warned || provided.has(v.name.toUpperCase()))
 					continue;
 				k.has_warned = true;
 				let code, since, message = warn.varisunset(v.name);
