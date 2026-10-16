@@ -18,7 +18,7 @@ function unsetWarnings(text: string) {
 		lex.actived = true;
 		lex.parseScript();
 		getSymbolInfo(lex);
-		return lex.diagnostics.map(d => d.message).filter(m => /never be assigned/.test(m));
+		return lex.diagnostics.map(d => d.message).filter(m => /never be assigned|might not have member/.test(m));
 	} finally {
 		configCache.Warn = { ...configCache.Warn, VarUnset: previous };
 		for (const key of Object.keys(lexers))
@@ -40,5 +40,11 @@ suite('Test @host directive', () => {
 		const declared = unsetWarnings('#Requires AutoHotkey v2.0\n; @host CONF_FILE\n\nShow() {\n    a := CONF_FILE\n    b := OTHER_FILE\n}\n');
 		assert.equal(declared.length, 1);
 		assert.match(declared[0], /OTHER_FILE/);
+	});
+
+	test('silences a member the subclass provides', () => {
+		const body = 'class Base {\n    Run() {\n        return this.Step()\n    }\n}\n';
+		assert.equal(unsetWarnings(body).length, 1);
+		assert.equal(unsetWarnings('; @host Step\n' + body).length, 0);
 	});
 });

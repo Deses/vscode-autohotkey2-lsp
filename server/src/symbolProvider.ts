@@ -546,8 +546,9 @@ export function getSymbolInfo(lex: Lexer, mod?: Module, result_?: AhkSymbol[],
 	}
 
 	function resolveUndefinedProp() {
+		const provided = hostNames(lex.document);
 		for (const [tk, cls] of undefined_props.entries()) {
-			if (cls.undefined?.[tk.content.toUpperCase()])
+			if (cls.undefined?.[tk.content.toUpperCase()] && !provided.has(tk.content.toUpperCase()))
 				lex.addDiagnostic(diagnostic.maybehavenotmember(cls.name, tk.content), tk.offset, tk.length, { severity: 2 });
 		}
 	}
