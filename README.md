@@ -31,7 +31,7 @@ Lexers are still keyed by the path as written in `#Include`, not by real path, b
 npm ci
 node esbuild.mjs
 npx vsce package
-code --install-extension ahk2-lsp-3.1.7-deses.1.vsix
+code --install-extension ahk2-lsp-3.1.8-deses.1.vsix
 ```
 
 ### Merging upstream
