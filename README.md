@@ -6,21 +6,23 @@
 
 ## Differences from upstream
 
-- **Include closure computed in one graph pass.** Upstream rebuilds `includeCache` and `includedCache` by recursing through the include graph and copying objects at every edge, which grows exponentially with shared includes. On a project whose entry script pulls in about 110 files, opening the entry script took 115 s; here it takes 0.7 s, and server memory drops from 730 MB to 360 MB. The old caches were also incomplete (on a corpus of five such projects, 631 entries were missing from the include closure and 7,312 from the reverse one); the new ones match a reference closure exactly. Code: `computeIncludeClosures` in `server/src/lexer2.ts`, tests in `server/src/test/includeClosure.test.ts`.
-- **Missing includes in the Problems panel for the whole project.** With `AutoHotkey2.ProjectMissingIncludes` (on by default) every AutoHotkey file in the workspace folders is checked in the background, open or not, and a use of a class or function whose defining file the file does not include is reported as `'X' is defined in <path>, which this file does not include`. It follows the `ExplicitContextOnly` setting: turn that on to check each file only against what its own includes provide (Java-style), instead of also counting what the scripts that include it bring in. Code: `server/src/projectDiagnostics.ts`.
-- **Quick fix "Add '#Include ...'".** On those warnings, `Ctrl+.` inserts the include (path relative to the file, after the last existing include or the header), or "Add N missing includes" for several at once. Code: `server/src/includeActions.ts`.
-- **"Organize includes" source action** (`Shift+Alt+O`, or Source Action in the lightbulb menu). It adds missing includes that have a single candidate, removes duplicate lines, removes an include that is provably dead (the files it alone brings in contain only classes and functions, and none of their names appear in this file, in the files it includes, or in the files that include it; about one include in a hundred qualifies in the author's repos), and sorts each block of consecutive `#Include` lines: folders before files, case-insensitive, which is the order most hand-sorted blocks in the author's repos already follow. Blocks are separated by blank lines, comments and directory includes (`#Include <dir>`), so groups and load order across them are untouched. It is not run on save. Code: `server/src/organizeIncludes.ts`.
-- **Mounted folders (`AutoHotkey2.MountedAt`).** A folder shared by several projects through a directory symlink (for example `automaton-commons`, which every game mounts as `app\commons`) can say where it appears inside one reference host, in its own `.vscode/settings.json`: `"AutoHotkey2.MountedAt": "../ZZZ-Automaton/app/commons"`. Its files are then analysed as the host's copy: one lexer per file instead of two, relative includes such as `..\..\types\X.ahk2` resolve into the host, symbols the host provides are found, hover and go to definition reach the host's files, and the file is checked in the host's context (as if `ExplicitContextOnly` were off for it). Diagnostics and edits still go to the file you opened. Code: `server/src/mounts.ts`, tests in `server/src/test/mounts.test.ts`.
-- **`; @host NAME, ...`** on a comment line silences "appears to never be assigned a value" and "might not have member" for those names in that file (globals or members the host project or a subclass provides).
-- **The project-wide check scans every workspace folder before analysing any file**, so definitions in a folder processed later are seen.
-- **Closing a file no longer wipes the include lists of files that stay loaded.** Upstream cleared them, so after closing a file other files could briefly lose symbols from their includes (false "never assigned" warnings until something re-parsed them).
-- **`getRelevance` is cached** per file until the include caches change; with complete closures it had become the main cost of analysing a file (30 s of 49 s when opening every file of one project).
-- **`Files.ScanMaxDepth` is actually read.** The server only looked at `Files.MaxDepth`, so the documented setting never had any effect.
-- **File watcher covers `.ahk2` and `.ah2`.** Upstream only watched `*.ahk`, so changes on disk to other AHK v2 files that were not open in an editor never reached the server.
-- **Builds from a clean checkout.** TypeScript is bumped to 5.9.3 and `skipLibCheck` is on, so `npm run check-types` passes.
-- **Different extension id.** `deses.ahk2-lsp`, display name "AutoHotkey v2 Language Support (Deses fork)". Setting names (`AutoHotkey2.*`) are unchanged. It registers the same language and commands as upstream, so install only one of the two in a VS Code profile.
+This fork opens large include trees much faster and checks includes across the whole project.
 
-Not changed on purpose: lexers are keyed by the path as written in the `#Include`, not by real path. Projects that share a library through a directory symlink and include host files relative to it (`#Include ..\..\types\X.ahk2`) rely on that.
+| | Upstream | This fork |
+|---|---|---|
+| Open the entry script of a 110 file project | 115 s | 0.7 s |
+| Open the entry script of a second project | 26 s | 0.4 s |
+| Server memory on the 110 file project | 730 MB | 360 MB |
+
+- Includes are resolved in one pass. Upstream's caches were also incomplete, which caused false warnings.
+- Missing includes show up in the Problems panel for every file in the workspace (`AutoHotkey2.ProjectMissingIncludes`, on by default). A quick fix adds the `#Include`.
+- "Organize includes" (`Shift+Alt+O`) adds includes with a single candidate, removes duplicates and provably unused ones, and sorts each block. It never runs on save.
+- `AutoHotkey2.MountedAt` lets a folder shared through a symlink be analysed as it appears in one reference project, so its relative includes resolve.
+- `; @host NAME, ...` on a comment line silences "appears to never be assigned a value" and "might not have member" for those names in that file.
+- Fixes: closing a file no longer drops the include lists of other files, `Files.ScanMaxDepth` is read, the file watcher covers `.ahk2` and `.ah2`, and the project builds from a clean checkout.
+- Different extension id (`deses.ahk2-lsp`), same settings and commands as upstream. Install only one of the two per VS Code profile.
+
+Lexers are still keyed by the path as written in `#Include`, not by real path, because projects that share a library through a symlink rely on it.
 
 ### Build and install
 
@@ -28,7 +30,7 @@ Not changed on purpose: lexers are keyed by the path as written in the `#Include
 npm ci
 node esbuild.mjs
 npx vsce package
-code --install-extension ahk2-lsp-3.1.5-deses.1.vsix
+code --install-extension ahk2-lsp-3.1.6-deses.1.vsix
 ```
 
 ### Merging upstream
