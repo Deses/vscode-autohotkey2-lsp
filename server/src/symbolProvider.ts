@@ -7,6 +7,7 @@ import {
 	getClassBase, getClassConstructor, getClassMember, getClassMembers, getImplicitImports, getModuleImporteds, getParamCount, getWorkspaceFile, hint, inactiveVars,
 	invokeCheck, isContinuousLine, lexers, openFile, resolveVarAlias, sym_related_msg, sym_type, utils, warn, workspaceFolders
 } from './common';
+import { hostNames } from './hostNames';
 import { missingIncludeInfo } from './includeActions';
 
 export function symbolProvider(params: DocumentSymbolParams, token?: CancellationToken): SymbolInformation[] {
@@ -95,9 +96,10 @@ export function getSymbolInfo(lex: Lexer, mod?: Module, result_?: AhkSymbol[],
 		};
 		for (const t of unused)
 			t.name[0] !== '_' && lex.diagnostics.push({ range: t.selectionRange, ...diag });
-		if (configCache.Warn?.VarUnset)
+		if (configCache.Warn?.VarUnset) {
+			const provided = hostNames(document);
 			for (const [k, v] of unset_vars) {
-				if (k.assigned || k.has_warned)
+				if (k.assigned || k.has_warned || provided.has(v.name.toUpperCase()))
 					continue;
 				k.has_warned = true;
 				let code, since, message = warn.varisunset(v.name);
@@ -110,6 +112,7 @@ export function getSymbolInfo(lex: Lexer, mod?: Module, result_?: AhkSymbol[],
 					data: code === 'built-in library' ? undefined : { unset: v.name }
 				});
 			}
+		}
 		if (lex.actived) {
 			checksamename(lex, mod);
 			resolveUndefinedProp();

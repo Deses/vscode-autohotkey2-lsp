@@ -11,6 +11,7 @@
 - **Quick fix "Add '#Include ...'".** On those warnings, `Ctrl+.` inserts the include (path relative to the file, after the last existing include or the header), or "Add N missing includes" for several at once. Code: `server/src/includeActions.ts`.
 - **"Organize includes" source action** (`Shift+Alt+O`, or Source Action in the lightbulb menu). It adds missing includes that have a single candidate, removes duplicate lines, removes an include that is provably dead (the files it alone brings in contain only classes and functions, and none of their names appear in this file, in the files it includes, or in the files that include it; about one include in a hundred qualifies in the author's repos), and sorts each block of consecutive `#Include` lines: folders before files, case-insensitive, which is the order most hand-sorted blocks in the author's repos already follow. Blocks are separated by blank lines, comments and directory includes (`#Include <dir>`), so groups and load order across them are untouched. It is not run on save. Code: `server/src/organizeIncludes.ts`.
 - **Mounted folders (`AutoHotkey2.MountedAt`).** A folder shared by several projects through a directory symlink (for example `automaton-commons`, which every game mounts as `app\commons`) can say where it appears inside one reference host, in its own `.vscode/settings.json`: `"AutoHotkey2.MountedAt": "../ZZZ-Automaton/app/commons"`. Its files are then analysed as the host's copy: one lexer per file instead of two, relative includes such as `..\..\types\X.ahk2` resolve into the host, symbols the host provides are found, hover and go to definition reach the host's files, and the file is checked in the host's context (as if `ExplicitContextOnly` were off for it). Diagnostics and edits still go to the file you opened. Code: `server/src/mounts.ts`, tests in `server/src/test/mounts.test.ts`.
+- **`; @host NAME, ...`** on a comment line silences "appears to never be assigned a value" for those names in that file, for globals the host project defines.
 - **The project-wide check scans every workspace folder before analysing any file**, so definitions in a folder processed later are seen.
 - **Closing a file no longer wipes the include lists of files that stay loaded.** Upstream cleared them, so after closing a file other files could briefly lose symbols from their includes (false "never assigned" warnings until something re-parsed them).
 - **`getRelevance` is cached** per file until the include caches change; with complete closures it had become the main cost of analysing a file (30 s of 49 s when opening every file of one project).
@@ -27,7 +28,7 @@ Not changed on purpose: lexers are keyed by the path as written in the `#Include
 npm ci
 node esbuild.mjs
 npx vsce package
-code --install-extension ahk2-lsp-3.1.3-deses.1.vsix
+code --install-extension ahk2-lsp-3.1.4-deses.1.vsix
 ```
 
 ### Merging upstream
