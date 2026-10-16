@@ -35,7 +35,9 @@ const ahkprocesses = new Map<number, ChildProcess & { path?: string }>();
 const id_has_register: string[] = [], isWindows = process.platform === 'win32';
 const textdecoders = [new TextDecoder('utf8', { fatal: true }), new TextDecoder('utf-16le', { fatal: true })];
 const loadedCollection = {
-	'ahk2.browse': 'Browse your file system to find AutoHotkey2 interpreter',
+	'ahk2.analyze.done': 'Analyzed {0} files, {1} problems',
+	'ahk2.analyze.running': 'Analyzing folder...',
+	'ahk2.browse':'Browse your file system to find AutoHotkey2 interpreter',
 	'ahk2.compiledfailed': 'Compiled failed!',
 	'ahk2.compiledsuccessfully': 'Compiled successfully!',
 	'ahk2.current': 'Current: {0}',

@@ -1,4 +1,4 @@
-import { commands, ConfigurationTarget, languages, Range, SnippetString, TextEditor, TextEditorEdit, window, workspace, WorkspaceConfiguration, WorkspaceEdit } from 'vscode';
+import { commands, ConfigurationTarget, languages, ProgressLocation, Range, SnippetString, TextEditor, TextEditorEdit, Uri, window, workspace, WorkspaceConfiguration, WorkspaceEdit } from 'vscode';
 import * as LSP from 'vscode-languageclient';
 import type { LocalizeKey } from './extension';
 
@@ -88,6 +88,16 @@ export function registerCommonFeatures(client: LSP.BaseLanguageClient, localize:
 		workspace.onDidCloseTextDocument(e => client.sendNotification('closeTextDocument',
 			e.isClosed ? { uri: '', id: '' } : { uri: e.uri.toString(), id: e.languageId })),
 	);
+	process.env.BROWSER || disposables.push(commands.registerCommand('ahk2.analyze.folder', async (folder?: Uri) => {
+		if (!folder)
+			return;
+		const result = await window.withProgress(
+			{ location: ProgressLocation.Notification, title: localize['ahk2.analyze.running'] ?? 'Analyzing folder...' },
+			() => client.sendRequest<{ files: number, problems: number }>('analyzeFolder', folder.toString()));
+		window.showInformationMessage((localize['ahk2.analyze.done'] ?? 'Analyzed {0} files, {1} problems')
+			.replace('{0}', String(result.files)).replace('{1}', String(result.problems)));
+		commands.executeCommand('workbench.actions.view.problems');
+	}));
 	chars && disposables.push(languages.registerCompletionItemProvider({ language: 'ahk2' },
 		{ provideCompletionItems: () => null }, ...chars.split('')));
 	client.onNotification('switchToV1', (uri: string) => {

@@ -4,6 +4,7 @@ import {
 	findClass, generateTypeAnnotation, joinTypes, lexers, parseInclude, restorePath,
 	semanticTokensOnFull, traverseInclude, updateIncludeCache, utils
 } from './common';
+import { analyzeFolder } from './projectDiagnostics';
 
 const request_handlers: Record<string, (params: never) => unknown> = {
 	extractSymbols,
@@ -248,6 +249,7 @@ function getContent(uri: string) {
 export function getRequestHandlers(commands?: string[]) {
 	if (!process.env.BROWSER)
 		Object.assign(request_handlers, {
+			analyzeFolder,
 			diagnoseAll,
 			getAhkVersion: utils.getAhkVersion,
 			setScriptDir,

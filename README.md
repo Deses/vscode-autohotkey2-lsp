@@ -17,6 +17,7 @@ This fork opens large include trees much faster and checks includes across the w
 - Includes are resolved in one pass. Upstream's caches were also incomplete, which caused false warnings.
 - Missing includes show up in the Problems panel for every file in the workspace (`AutoHotkey2.ProjectMissingIncludes`, on by default). A quick fix adds the `#Include`.
 - "Organize includes" (`Shift+Alt+O`) adds includes with a single candidate, removes duplicates and provably unused ones, and sorts each block. It never runs on save.
+- Right click a folder in the Explorer and choose "Analyze folder for problems" to check every AutoHotkey file in it, open or not. Errors and warnings go to the Problems panel.
 - `AutoHotkey2.MountedAt` lets a folder shared through a symlink be analysed as it appears in one reference project, so its relative includes resolve.
 - `; @host NAME, ...` on a comment line silences "appears to never be assigned a value" and "might not have member" for those names in that file.
 - Fixes: closing a file no longer drops the include lists of other files, `Files.ScanMaxDepth` is read, the file watcher covers `.ahk2` and `.ah2`, and the project builds from a clean checkout.
@@ -30,7 +31,7 @@ Lexers are still keyed by the path as written in `#Include`, not by real path, b
 npm ci
 node esbuild.mjs
 npx vsce package
-code --install-extension ahk2-lsp-3.1.6-deses.1.vsix
+code --install-extension ahk2-lsp-3.1.7-deses.1.vsix
 ```
 
 ### Merging upstream
