@@ -1,6 +1,7 @@
-import { relative, sep } from 'path';
+import { readdirSync, realpathSync, statSync } from 'fs';
+import { join, relative, sep } from 'path';
 import { CodeAction, CodeActionKind, Diagnostic, Position, TextEdit } from 'vscode-languageserver';
-import { URI, codeaction, diagnostic, libSymbols, parseProject } from './common';
+import { URI, codeaction, diagnostic, libSymbols, parseProject, restorePath } from './common';
 import type { Lexer } from './lexer';
 
 const scans = new Map<string, Promise<void>>();
@@ -29,16 +30,46 @@ export function missingIncludeInfo(lex: Lexer, name: string) {
 	return diagnostic.missinginclude(name, shown.join(' or ') + (files.length > 3 ? ', ...' : ''));
 }
 
+const skippedFolders = /^(\.git|\.venv.*|\.compiled|node_modules)$/i;
+const linkCache = new Map<string, { link: string, real: string }[]>();
+
+function linkedFolders(dir: string, depth = 3): { link: string, real: string }[] {
+	const cached = linkCache.get(dir);
+	if (cached)
+		return cached;
+	const found: { link: string, real: string }[] = [];
+	const walk = (path: string, left: number) => {
+		let entries;
+		try { entries = readdirSync(path, { withFileTypes: true }); } catch { return; }
+		for (const entry of entries) {
+			if (skippedFolders.test(entry.name))
+				continue;
+			const child = join(path, entry.name);
+			if (entry.isSymbolicLink()) {
+				try { statSync(child).isDirectory() && found.push({ link: child, real: realpathSync(child) }); } catch { }
+			} else if (entry.isDirectory() && left > 1)
+				walk(child, left - 1);
+		}
+	};
+	walk(dir, depth);
+	linkCache.set(dir, found);
+	return found;
+}
+
 export function findDefiningFiles(lex: Lexer, name: string) {
-	const upper = name.toUpperCase(), dir = projectDir(lex), paths: string[] = [];
+	const upper = name.toUpperCase(), dir = projectDir(lex), paths = new Set<string>();
 	for (const uri in libSymbols) {
 		const symbols = libSymbols[uri], path = symbols.fsPath;
-		if (uri === lex.uri || !path || !path.toLowerCase().startsWith(dir))
+		if (uri === lex.uri || !path || !symbols.some(s => s.name.toUpperCase() === upper))
 			continue;
-		if (symbols.some(s => s.name.toUpperCase() === upper))
-			paths.push(path);
+		const lower = path.toLowerCase();
+		if (lower.startsWith(dir))
+			paths.add(path);
+		else for (const { link, real } of linkedFolders(restorePath(dir.replace(/[\\/]$/, ''))))
+			if (lower.startsWith(real.toLowerCase() + sep))
+				paths.add(link + path.slice(real.length));
 	}
-	return paths.sort((a, b) => a.length - b.length || a.localeCompare(b));
+	return [...paths].sort((a, b) => a.length - b.length || a.localeCompare(b));
 }
 
 export function includeInsertion(lex: Lexer, paths: string[]): { edit: TextEdit, texts: string[] } {

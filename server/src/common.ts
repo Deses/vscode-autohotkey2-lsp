@@ -685,7 +685,7 @@ export async function parseUserLib() {
 function getLibSymbols(lex: Lexer) {
 	return Object.assign(
 		Object.values(lex.declaration).filter(it => it.kind === SymbolKind.Class || it.kind === SymbolKind.Function),
-		{ fsPath: lex.fsPath, islib: inLibDirs(lex.fsPath) }
+		{ fsPath: lex.document.uri ? URI.parse(lex.document.uri).fsPath : lex.fsPath, islib: inLibDirs(lex.fsPath) }
 	);
 }
 

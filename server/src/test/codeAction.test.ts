@@ -5,7 +5,7 @@ import { join } from 'path';
 import { CancellationToken, CodeAction } from 'vscode-languageserver';
 import {
 	Lexer, URI, clearLibSymbols, codeActionProvider, configCache, lexers, openFile, parseFolder,
-	setWorkspaceFolders, symbolProvider
+	setWorkspaceFolders
 } from '../common';
 
 suite('Test code actions', () => {
@@ -26,8 +26,6 @@ suite('Test code actions', () => {
 			lexers[uri.toLowerCase()] = lex;
 			lex.actived = true;
 			lex.parseScript();
-			symbolProvider({ textDocument: { uri } });
-			delete (lex as { diag_pending?: boolean }).diag_pending;
 			const range = { start: { line: 0, character: 0 }, end: { line: 5, character: 0 } };
 			const actions = await codeActionProvider({
 				textDocument: { uri }, range, context: { diagnostics: [], only: ['source.organizeImports'] }

@@ -1,6 +1,6 @@
 import { opendir } from 'fs/promises';
 import { CancellationToken, CodeAction, CodeActionParams, TextEdit } from 'vscode-languageserver';
-import { CodeActionKind, DiagnosticCode, DiagnosticTag, Maybe, TokenType, codeaction, configCache, lexers, restorePath } from './common';
+import { CodeActionKind, DiagnosticCode, DiagnosticTag, Maybe, TokenType, codeaction, configCache, lexers, restorePath, symbolProvider } from './common';
 import { includeQuickFixes, resolveMissingIncludes } from './includeActions';
 import { organizeEdits } from './organizeIncludes';
 import { unusedIncludeLines } from './unusedIncludes';
@@ -9,9 +9,9 @@ const words = ['catch', 'else', 'finally', 'until'];
 
 export async function codeActionProvider(params: CodeActionParams, token: CancellationToken): Promise<Maybe<CodeAction[]>> {
 	const uri = params.textDocument.uri, lex = lexers[uri.toLowerCase()];
-	if (!lex || token.isCancellationRequested || lex.diag_pending !== undefined) return;
+	if (!lex || token.isCancellationRequested) return;
 	const { document, indent, line_ranges, tokens } = lex,
-		{ context: { diagnostics, only }, range } = params;
+		{ context: { only }, range } = params, diagnostics = lex.diag_pending === undefined ? params.context.diagnostics : [];
 	const acts: CodeAction[] = [], replaces: Record<string, TextEdit[]> = {},
 		parens: TextEdit[] = [], unuseds: TextEdit[] = [];
 	const has_refactor = only?.toString().includes(CodeActionKind.Refactor) !== false;
@@ -62,6 +62,7 @@ export async function codeActionProvider(params: CodeActionParams, token: Cancel
 		const missing = await resolveMissingIncludes(lex, unsets);
 		acts.push(...includeQuickFixes(lex, missing, uri));
 		if (!only || only.some(kind => CodeActionKind.SourceOrganizeImports.startsWith(kind))) {
+			symbolProvider({ textDocument: { uri } });
 			const wanted = await resolveMissingIncludes(lex, lex.diagnostics.filter(it => it.data?.unset));
 			const add = [...new Set([...wanted.values()].filter(m => m.paths.length === 1).map(m => m.paths[0]))];
 			const edits = organizeEdits(lex, add, unusedIncludeLines(lex));
