@@ -4,7 +4,7 @@
 	"description": "AutoHotkey v2 Language Support, based on vscode-lsp. Fork of thqby's extension with a faster include closure.",
 	"author": "thqby",
 	"publisher": "deses",
-	"version": "3.1.8-deses.1",
+	"version": "3.1.8-deses.2",
 	"license": "LGPLv3.0",
 	"categories": [
 		"Formatters",
@@ -556,7 +556,7 @@
 				{
 					"command": "ahk2.run",
 					"group": "navigation@0",
-					"when": "resourceLangId == ahk2 && shellExecutionSupported"
+					"when": "resourceLangId == ahk2 && shellExecutionSupported && !automaton.inGame"
 				},
 				{
 					"command": "ahk2.stop",
