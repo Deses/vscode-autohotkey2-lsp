@@ -10,7 +10,7 @@ import {
 	parseInclude, parseProject, parseUserLib, resolvePath, setIsAhkH, setting, traverseInclude, URI, utils
 } from './common';
 import { documents, isInitialized, sendNotification, setConnection } from './connection';
-import { ahkVersion, setVersion } from './lexer';
+import { ahkVersion, alpha_35, setVersion } from './lexer';
 import { PEFile, RESOURCE_TYPE, searchAndOpenPEFile } from './PEFile';
 
 Object.assign(utils, {
@@ -45,7 +45,9 @@ async function initEnv(samefolder: boolean): Promise<boolean> {
 		showPathError(setting.versionerr());
 	if (!samefolder || !libDirs.length) {
 		libDirs.length = 0;
-		libDirs.push(a_Vars.mydocuments + '\\AutoHotkey\\Lib\\',
+		if (ahkVersion >= alpha_35 && a_Vars.$lib)
+			libDirs.push(...a_Vars.$lib.split(';'));
+		else libDirs.push(a_Vars.mydocuments + '\\AutoHotkey\\Lib\\',
 			a_Vars.ahkpath.replace(/[^\\/]+$/, 'Lib\\'));
 		let lb;
 		for (lb of Object.values(libSymbols))
@@ -191,28 +193,35 @@ function getRCData(name?: string) {
 function getScriptVars(): Promise<Record<string, string> | undefined> {
 	const path = `\\\\.\\pipe\\ahk-script-${Buffer.from(Uint16Array.from(
 		[process.pid, Date.now()]).buffer).toString('hex')}`;
-	let has_written = false, output: string | undefined;
+	let output: string | undefined;
 	const server = createServer().listen(path);
 	const script = `
 #NoTrayIcon
-s := "$import|" EnvGet("AhkImportPath") "\`n"
+s := "$lib|" EnvGet(VerCompare(A_AhkVersion, "2.1-alpha.35") ? "AhkLibPath" : "AhkImportPath") "\`n"
 for _, k in ${JSON.stringify([...builtinVars, ...builtinVars_h])}
 	try if SubStr(k, 1, 2) = "a_" && !IsObject(v := %k%)
 		s .= SubStr(k, 3) "|" v "\`n"
 FileOpen(A_ScriptFullPath, "w", "utf-8-raw").Write(s)`;
 	return new Promise<void>(r => {
+		let state = Promise.resolve(0);
 		server.on('connection', socket => {
 			const destroy = () => socket.destroy();
 			socket.on('error', destroy);
-			if (has_written) {
-				output = '';
-				socket.setEncoding('utf8')
-					.on('data', data => output! += data)
-					.on('end', () => (r(), destroy()));
-				return;
-			}
-			has_written = socket.write(script);
-			socket.destroySoon();
+			state = state.then(state => {
+				switch (state) {
+					case 0: return new Promise(r => {
+						socket.write(script, err => r(err ? 0 : 1));
+						socket.destroySoon();
+					});
+					case 1:
+						output = '';
+						socket.setEncoding('utf8')
+							.on('data', data => output! += data)
+							.on('end', () => (r(), destroy()));
+						return 2;
+					default: return destroy(), 2;
+				}
+			});
 		});
 		const cp = spawn(ahkPath, ['/CP65001', '/ErrorStdOut', path]);
 		cp.on('exit', code => code !== 0 ? r() : output === undefined && setTimeout(r, 1000));

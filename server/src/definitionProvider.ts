@@ -26,11 +26,13 @@ export async function defintionProvider(params: DefinitionParams, token: Cancell
 		return;
 	}
 	pt = tk.previous_token;
+	if (pt?.type === TokenType.Reserved && pt.content.toLowerCase() === 'export')
+		pt = pt.previous_token;
 	if (pt?.type === TokenType.Directive && !tk.topofline && pt.content.toLowerCase() === '#import' &&
 		(tk.type === TokenType.Identifier || tk.type === TokenType.String)) {
 		const v = tk.value as string ?? tk.content;
 		let mod, has_default;
-		mod = lex.import?.mod?.[v.toUpperCase()];
+		mod = (lex.inDirectiveModule(params.position) ?? lex).import?.mod?.[v.toUpperCase()];
 		if (mod) {
 			const rg: Range = {
 				start: lex.document.positionAt(tk.offset),

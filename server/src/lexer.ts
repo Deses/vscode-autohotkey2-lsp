@@ -179,6 +179,7 @@ export class Lexer implements Module {
 	getToken: (offset?: number, ignorecomment?: boolean) => Token;
 	importLex?: Set<Lexer>;
 	importedLex?: Set<Lexer>;
+	importDir?: string[];
 	includedir = new Map<number, string>();
 	indent = '\t';
 	is_virtual = false;		// uris like `vscode-local-history:`
@@ -391,7 +392,7 @@ export class Lexer implements Module {
 										++j, parse_types(fn);
 									else fn.range.end = this.document.positionAt(lk.offset + lk.length);
 									fn.full += ` => ${joinTypes(fn.type_annotations) || 'void'}`;
-									tk.symbol = tk.definition = fn, fn.decl = true;
+									tk.symbol = tk.definition = fn, fn.decl = fn.def = true;
 									if (!META_FUNCNAME.includes(_low = fn.name.toUpperCase(), metafnIndex))
 										tk.semantic = {
 											type: blocks ? SemanticTokenTypes.method : SemanticTokenTypes.function,
@@ -478,6 +479,7 @@ export class Lexer implements Module {
 									set_detail(_cm.symbol = cl, _cm);
 								cl.full = cls.join('.'), cl.property = {}, cl.prototype =
 									{ ...cl, detail: undefined, property: cl.$property = {} };
+								cl.decl = cl.def = true;
 								_low = cl.name.toUpperCase();
 								_parent.children!.push(cl);
 								if (!cl.since) {
@@ -528,7 +530,7 @@ export class Lexer implements Module {
 								it.uri = uri;
 							// fall through
 							case SymbolKind.Class:
-								it.overwrite ??= d, it.decl = it.def = true;
+								it.overwrite ??= d;
 								if (!(t = ahkVars[k]) || d >= (t.overwrite ?? 0))
 									ahkVars[k] = it;
 								break;
@@ -841,7 +843,7 @@ export class Lexer implements Module {
 				}
 				checkDupError(this.declaration, this.children, this, true);
 				if (this.module) {
-					this.addFoldingRange(...this.curr_mod!.ranges!.at(-1)!)
+					this.addFoldingRange(...this.curr_mod!.offsets!.at(-1)!)
 					Object.values(this.module)
 						.forEach(it => checkDupError(it.declaration, it.children, this, true));
 				}
@@ -862,6 +864,11 @@ export class Lexer implements Module {
 							throw new Error();
 						else l = start;
 				}
+				// function sort_import(mod: Module) {
+				// 	mod.import?.imp.sort((a, b) =>
+				// 		(a.parent?.selectionRange.start.line ?? -1) -
+				// 		(b.parent?.selectionRange.start.line ?? -1));
+				// }
 			}
 		}
 
@@ -1219,7 +1226,7 @@ export class Lexer implements Module {
 											continue;
 										break;
 									case 'export':
-										if (ahkVersion < alpha_11)
+										if (ahkVersion < alpha_11 || ahkVersion >= alpha_31)
 											break;
 										if (parse_export(ahkVersion < alpha_11 + 9))
 											continue;
@@ -1287,28 +1294,17 @@ export class Lexer implements Module {
 										fc.semantic = { type: SemanticTokenTypes.property, modifier: SemanticTokenModifiers.definition | (isstatic as unknown as number) };
 										if (tk.content === '{') {
 											let nk: Token, sk: Token, tn: FuncNode | undefined, _low: string;
+											let is_union;
 											const brace = tk.offset;
 											tk.previous_pair_pos = oo;
 											nexttoken(), next = false, mode = BlockType.Func;
 											if (tk.type as TokenType === TokenType.BlockEnd && !lk.topofline && !tk.topofline)
 												unexpected(tk);
 											while (nexttoken() && tk.type as TokenType !== TokenType.BlockEnd) {
-												if (tk.topofline && /^[gs]et$/.test(_low = tk.content.toLowerCase())) {
-													nexttoken(), nk = lk;
-													if (tk.content as string === '=>') {
-														_parent = tn = createFunc(_low, SymbolKind.Function,
-															make_range(lk.offset, parser_pos - lk.offset), make_range(lk.offset, lk.length), [...par]);
-														mode = BlockType.Method, tn.returns = [parser_pos, 0], tn.has_this_param = true;
-														tn.parent = prop, tn.children = parse_line(undefined, 'return', 1);
-														tn.range.end = document.positionAt(tn.returns[1] = lk.offset + lk.length);
-														mode = BlockType.Class, _parent = _cls, tk.fat_arrow_end = true;
-														_this.addFoldingRangePos(tn.range.start, tn.range.end, 'line');
-														if (_low === 'set')
-															tn.params.unshift(HIDDEN_PARAMS.value);
-														else prop.returns = tn.returns;
-														adddeclaration(tn);
-														line_ranges.push([tn.range.end.line, nk.offset]);
-													} else if (tk.content === '{') {
+												nexttoken(), nk = lk;
+												if (lk.topofline && PROP_NEXT_TOKEN.includes(tk.content, 1) &&
+													/^[gs]et$/.test(_low = lk.content.toLowerCase())) {
+													if (tk.type === TokenType.BlockStart) {
 														const pop = return_push(true);
 														tn = createFunc(_low, SymbolKind.Function,
 															make_range(nk.offset, parser_pos - nk.offset), make_range(nk.offset, 3), [...par]);
@@ -1324,36 +1320,40 @@ export class Lexer implements Module {
 														tn.has_this_param = true, adddeclaration(tn);
 														_this.addSymbolFolding(tn, sk.offset);
 													} else {
-														tn = undefined;
-														_this.addDiagnostic(diagnostic.invalidprop(), tk.offset, tk.length);
-														if (tk.content === '}') {
-															next = false; break;
-														} else {
-															let b = 0;
-															while (tk.type as TokenType !== TokenType.EOF) {
-																if (tk.content === '{')
-																	b++;
-																else if (tk.content === '}' && (--b) < 0)
-																	break;
-																nexttoken();
-															}
-															next = false;
-														}
+														_parent = tn = createFunc(_low, SymbolKind.Function,
+															make_range(lk.offset, parser_pos - lk.offset), make_range(lk.offset, lk.length), [...par]);
+														mode = BlockType.Method, tn.returns = [parser_pos, 0], tn.has_this_param = true;
+														tn.parent = prop, tn.children = parse_line(undefined, 'return', 1);
+														tn.range.end = document.positionAt(tn.returns[1] = lk.offset + lk.length);
+														mode = BlockType.Class, _parent = _cls, tk.fat_arrow_end = true;
+														_this.addFoldingRangePos(tn.range.start, tn.range.end, 'line');
+														if (_low === 'set')
+															tn.params.unshift(HIDDEN_PARAMS.value);
+														else prop.returns = tn.returns;
+														adddeclaration(tn);
+														line_ranges.push([tn.range.end.line, nk.offset]);
 													}
-													if (tn && tn !== (prop[tn.name as 'get' | 'set'] ??= tn))
+													if (tn !== (prop[tn.name as 'get' | 'set'] ??= tn))
 														_this.addDiagnostic(diagnostic.dupdeclaration(), nk.offset, nk.length);
-												} else {
-													let b = 0;
-													_this.addDiagnostic(diagnostic.invalidprop(), tk.offset, tk.length);
-													next = false;
-													while (nexttoken()) {
-														if (tk.content === '{')
-															b++;
-														else if (tk.content === '}' && (--b) < 0)
-															break;
-													}
-													next = false;
-												}
+												} else if (is_union ??= ahkVersion >= alpha_35 - 1 &&
+													fc.next_token_offset === brace && nk.previous_token?.offset === brace &&
+													tk.content as string === ':' && fc.content.toLowerCase() === 'union') {
+													tk = lk, lk = EMPTY_TOKEN, parser_pos = tk.offset + tk.length, next = false;
+													fc.semantic = undefined!, mode = BlockType.Class, result.pop();
+													do {
+														lk = EMPTY_TOKEN;
+														if (!isIdentifier(tk.content) || _this.getToken(tk.offset + tk.length, true).content !== ':')
+															_this.addDiagnostic(diagnostic.invalidprop(), tk.offset, tk.length),
+																next = false, parse_line();
+														else result.push(...parse_statement().filter(it => !(!it.typed && _this.diagnostics.push({
+															message: diagnostic.invalidprop(),
+															range: it.selectionRange
+														}))));
+													} while (tk.type !== TokenType.BlockEnd && tk.type !== TokenType.EOF);
+													next = true;
+													break;
+												} else _this.addDiagnostic(diagnostic.invalidprop2(), lk.offset, lk.length),
+													next = false, parse_line();
 											}
 											prop.range.end = document.positionAt(parser_pos - 1), mode = BlockType.Class;
 											_this.addSymbolFolding(prop, brace);
@@ -2284,11 +2284,14 @@ export class Lexer implements Module {
 					fr: number[] = [], syms: Variable[] = [];
 				const pi: ParamInfo = { offset: tk.offset, count: 0, comma: [], miss: [], unknown: false };
 				let must = le20, wildcard = Wildcard.None, has_suffix_imps: boolean | 0, mk: Token | undefined;
+				// let parent;
 				if (lk.type === TokenType.Directive) {
 					kws.pop(), must = true;
 					if (!tk.topofline && tk.type === TokenType.Identifier &&
 						tk.content.toLowerCase() === 'export')
 						kws.push(tk), nexttoken(), export_ = true;
+					if (mode & BlockType.Func)
+						export_ && (export_ = false, unexpected(lk));
 				}
 				const r = parse();
 				if (r) {
@@ -2300,6 +2303,8 @@ export class Lexer implements Module {
 					export_ && wildcard && (wildcard = Wildcard.Export);
 					((_this.curr_mod ?? _this).import ??= { imp: [] })
 						.imp.push({ from, tk: mk, wildcard, var: syms });
+					// if (parent && wildcard)
+					// 	((parent as FuncNode).import ??= []).push(from);
 					for (const s of syms)
 						s.from = from, export_ && add_export(s);
 					pi.name = from, mk.as ??= null;
@@ -2394,8 +2399,13 @@ export class Lexer implements Module {
 					while (nexttoken()) {
 						if (tk.content === '*') {
 							nexttoken();
-							if (tk.type === TokenType.Comma || tk.type === TokenType.BlockEnd)
-								wildcard = Wildcard.Import;
+							if (tk.type === TokenType.Comma || tk.type === TokenType.BlockEnd) {
+								if (mode & BlockType.Func)
+									_this.addDiagnostic(warn.notimplemented(), lk.offset, lk.length, {
+										severity: DiagnosticSeverity.Warning
+									});
+								else wildcard = Wildcard.Import;
+							} else unexpected(lk);
 						} else if (isIdentifier((sk = tk).content)) {
 							if (nexttoken(), tk.type === TokenType.Operator && tk.content.toLowerCase() === 'as') {
 								tk.semantic = SE_KEYWORD;
@@ -2467,9 +2477,19 @@ export class Lexer implements Module {
 									continue;
 								next = false;
 								if (maybecaller && tk.type as TokenType !== TokenType.Assign && !'=??'.includes(tk.content || ' ') &&
-									', \t\r\n'.includes(c = input.charAt(lk.offset + lk.length)))
-									parse_call(lk, c, SymbolKind.Method);
-								else
+									', \t\r\n'.includes(c = input.charAt(lk.offset + lk.length))) {
+									if (!tk.topofline && tk.content === '[') {
+										const b = tk;
+										let t;
+										_this.diagnostics.push(t = {
+											message: warn.notmethodcall(),
+											range: ZERO_RANGE,
+											severity: DiagnosticSeverity.Warning
+										});
+										result.push(...parse_line());
+										t.range = make_range(b.previous_token!.offset, (b.next_pair_pos ?? input_length) + 1 - b.previous_token!.offset);
+									} else parse_call(lk, c, SymbolKind.Method);
+								} else
 									result.push(...parse_line());
 							} else
 								next = false, result.push(...parse_line());
@@ -2786,27 +2806,32 @@ export class Lexer implements Module {
 							if (!isIdentifier(name) || name[0] <= '9')
 								_this.diagnostics.push({ message: diagnostic.invalidsymbolname(), range: rg });
 							if (mod)
-								mod.ranges!.at(-1)![1] = tk.offset, _this.addFoldingRange(...mod.ranges!.at(-1)!);
+								mod.offsets!.at(-1)![1] = tk.offset, _this.addFoldingRange(...mod.offsets!.at(-1)!);
 							mod = _this.curr_mod = (_this.module ??= {})[name.toUpperCase()] ??= {
 								name: name || '\0', kind: SymbolKind.Module,
 								range: ZERO_RANGE, selectionRange: rg,
 								bc_mode_def: bc_mode = _this.bc_mode ?? _this.bc_mode_def,
 								children: [],
 								declaration: o = {},
+								export: ahkVersion >= alpha_31 ? o : undefined,
 								property: o,
 								include: {},
-								ranges: [],
+								offsets: [],
 								uri: _this.uri,
 							};
 							_parent = mod;
 							result = mod.children;
 							includetable = mod.include;
-							mod.ranges!.push([tk.offset, input_length]);
+							mod.offsets!.push([tk.offset, input_length]);
 						}
 						break;
 					case '#import':
 						if (ahkVersion < alpha_11 + 9)
 							_this.addDiagnostic(requireVerN(alpha_11 + 9), tk.offset, tk.length);
+						if (mode === BlockType.Class) {
+							unexpected(tk);
+							break;
+						}
 						nexttoken(), parse_import(false);
 						break;
 					case '#structpack':
@@ -2822,7 +2847,7 @@ export class Lexer implements Module {
 				skip?.(_lk, next ? parser_pos : tk);
 			}
 
-			function parse_statement(local: string) {
+			function parse_statement(local = '') {
 				const sta: Variable[] = [], md = mode, incls = md === BlockType.Class;
 				let pc: Token | undefined;
 				block_mode = false, incls && (mode = BlockType.Method);
@@ -2935,7 +2960,7 @@ export class Lexer implements Module {
 											} else break;
 										}
 										if (_tp) {
-											if (tk.previous_token === _tp && /^([iu](8|16|32|64)|f(32|64)|[iu]ptr)$/i.test(_tp.content)) {
+											if (ahkVersion < alpha_35 - 5 && tk.previous_token === _tp && /^([iu](8|16|32|64)|f(32|64)|[iu]ptr)$/i.test(_tp.content)) {
 												v.type_annotations = [/^f/i.test(_tp.content) ? FLOAT : INTEGER];
 												_tp.semantic = SE_CLASS;
 											} else if (_tp.type === TokenType.Identifier)
@@ -2980,9 +3005,10 @@ export class Lexer implements Module {
 							} else unexpected(tk), parse_expression(',');
 							break;
 						case TokenType.Comma:
-							lk.content === ',' && unexpected(tk);
+							lk.type === TokenType.Comma && unexpected(tk);
 							continue;
 						case TokenType.BlockEnd:
+							lk.type === TokenType.Comma && unexpected(tk);
 							next = false;
 							break loop;
 						case TokenType.Number:
@@ -3146,7 +3172,7 @@ export class Lexer implements Module {
 								const l = _this.diagnostics.length, bo = tk.offset;
 								let must;
 								if (end === '{') {
-									if (lk.topofline && lk.type === TokenType.Reserved) {
+									if (lk.type === TokenType.Reserved && (lk.topofline || LINE_STARTERS.includes(lk.content.toLowerCase()))) {
 										if (!tk.topofline && !_this.getToken(parser_pos, true).topofline)
 											must = true;
 									} else if (!(lk.op_type === 1 || isYieldsOperand(lk)))
@@ -6564,6 +6590,7 @@ export class Lexer implements Module {
 		this.bc_mode = this.checkmember = this.curr_mod = this.explicitContext =
 			this.export = this.import = this.importLex = this.maybev1 =
 			this.module = this.st = this.symbolInformation = this.winapi = undefined!;
+		ahkVersion >= alpha_31 && (this.export = this.declaration);
 	}
 
 	get mounted() { return mountedUri(this.document.uri) !== this.document.uri; }
@@ -6677,7 +6704,7 @@ export class Lexer implements Module {
 		if (is_global)
 			node = from_d(this.d_uri) ?? (mod ?? this).declaration[name] ??
 				(is_global = 1, node) ?? (is_global = true, this.typedef[name]);
-		return node ? { node, uri, mod, scope, is_global, parent } : mod && null;
+		return node && { node, uri, mod, scope, is_global, parent };
 		function from_d(d_uri: string) {
 			const lex = lexers[d_uri];
 			if (!lex) return;
@@ -6842,7 +6869,7 @@ export class Lexer implements Module {
 		const offset = this.document.offsetAt(pos);
 		for (const n in mod) {
 			const m = mod[n];
-			for (const [s, e] of m.ranges!)
+			for (const [s, e] of m.offsets!)
 				if (offset < s) break;
 				else if (offset <= e)
 					return m;
@@ -6913,6 +6940,7 @@ export class Lexer implements Module {
 	}
 
 	initLibDirs(dir?: string) {
+		this.importDir = undefined;
 		if (process.env.BROWSER)
 			return;
 		let workfolder: string;
@@ -6930,8 +6958,11 @@ export class Lexer implements Module {
 		} else this.scriptdir = this.scriptpath.replace(/\\Lib(\\.+)?$/i, '');
 		this.libdirs = [dir = this.scriptdir + '\\Lib\\'];
 		dir = dir.toLowerCase();
-		for (const t of libDirs)
+		for (let t of libDirs) {
+			if (ahkVersion >= alpha_35 && t.includes('%'))
+				t = derefVar(t, this);
 			dir !== t.toLowerCase() && this.libdirs.push(t);
+		}
 	}
 
 	getColors() {
@@ -7188,7 +7219,7 @@ export function createModules(name: string, modules: Module[]) {
 		name, kind: SymbolKind.Module, modules,
 		range: ZERO_RANGE, selectionRange: ZERO_RANGE,
 		children: [], declaration: {},
-		include: null!, property: null!, ranges: null!,
+		include: null!, property: null!, offsets: null!,
 	};
 	return m;
 }
@@ -7512,6 +7543,28 @@ export function derefVar(str: string, lex?: Lexer, vars = a_Vars) {
 	});
 }
 
+export function getImportPath(lex: Lexer) {
+	return lex.importDir ??= (function () {
+		const dirs = [lex.scriptpath], set = new Set();
+		let t;
+		set.add(dirs[0].toLowerCase());
+		if (ahkVersion >= alpha_35) {
+			for (let p of [lex.scriptdir, ...libDirs]) {
+				if (p.includes('%'))
+					p = derefVar(p, lex);
+				if (!set.has(t = p.toLowerCase()))
+					set.add(t), dirs.push(p);
+			}
+		} else {
+			const r = a_Vars.$lib ? derefVar(a_Vars.$lib, undefined, {
+				...a_Vars, scriptdir: lex.scriptdir, linefile: lex.fsPath
+			}).split(';') : lex.libdirs.map(s => s.slice(0, -4));
+			r.forEach(p => set.has(t = p.toLowerCase()) || set.add(t) && dirs.push(p));
+		}
+		return dirs;
+	})();
+}
+
 //#region version
 export let ahkVersion = Infinity, metafnIndex = 0;
 export function setVersion(version: string) {
@@ -7524,6 +7577,8 @@ export const alpha_3 = versionEncode('2.1-alpha.3');
 const v2alpha1 = versionEncode('2.0-alpha.1');
 const alpha_11 = alpha_3 + 8;
 const alpha_21 = alpha_11 + 10;
+const alpha_31 = alpha_11 + 20;
+export const alpha_35 = alpha_31 + 4;
 function versionDecode(n: number) {
 	const v: number[] = [];
 	n += 3000;

@@ -49,7 +49,8 @@ export const diagnostic = {
 	invalidencoding: localize('diagnostic.invalidencoding', '\'{0}\' invalid file encoding'),
 	invalidhotdef: localize('diagnostic.invalidhotdef', 'Invalid hotkey definition'),
 	invalidparam: localize('diagnostic.invalidparam', 'Invalid parameter definition'),
-	invalidprop: localize('diagnostic.invalidprop', 'Invalid dynamic property'),
+	invalidprop: localize('diagnostic.invalidprop', 'Invalid class variable declaration'),
+	invalidprop2: localize('diagnostic.invalidprop2', 'Not a valid property getter/setter'),
 	invalidpropname: localize('diagnostic.invalidpropname', 'Invalid property name in object literal'),
 	invalidsymbolname: localize('diagnostic.invalidsymbolname', 'Invalid symbol naming \'{0}\''),
 	invalidsuper: localize('diagnostic.invalidsuper', '\'super\' is valid only inside a class'),
@@ -97,6 +98,7 @@ export const warn = {
 	callwithoutparentheses: localize('warn.callwithoutparentheses', 'This function or method call has no parentheses'),
 	localsameasglobal: localize('warn.localsameasglobal', 'This local variable \'{0}\' has the same name as a global variable'),
 	notimplemented: localize('warn.notimplemented', 'This feature has not been implemented'),
+	notmethodcall: localize('warn.notmethodcall', 'This is not a method call, but an expression'),
 	varisunset: localize('warn.varisunset', 'Variable \'{0}\' appears to never be assigned a value'),
 }
 
