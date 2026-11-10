@@ -229,7 +229,11 @@ async function loadMounts() {
 		lex.close(true);
 	}
 	setMounts(entries);
-	open.forEach(openDocument);
+	// No didChangeContent follows a reopen, so the fresh lexer must be parsed here.
+	for (const document of open) {
+		openDocument(document);
+		lexers[document.uri.toLowerCase()]?.update();
+	}
 }
 
 function sendDiagnostics(uri: string, diagnostics = []) {
