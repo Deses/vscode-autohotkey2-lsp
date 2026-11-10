@@ -2,7 +2,7 @@
 
 # AutoHotkey v2 Language Support
 
-> **Deses fork.** This is a fork of [thqby/vscode-autohotkey2-lsp](https://github.com/thqby/vscode-autohotkey2-lsp) (3.0.10 plus upstream PR #867). Everything below this section is the upstream README. Upstream changes are merged into the fork when they help.
+> **Deses fork.** This is a fork of [thqby/vscode-autohotkey2-lsp](https://github.com/thqby/vscode-autohotkey2-lsp) (based on upstream 3.1.0). Everything below this section is the upstream README. Upstream changes are merged into the fork when they help.
 
 ## Differences from upstream
 
@@ -31,7 +31,7 @@ Lexers are still keyed by the path as written in `#Include`, not by real path, b
 npm ci
 node esbuild.mjs
 npx vsce package
-code --install-extension ahk2-lsp-3.1.8-deses.1.vsix
+code --install-extension ahk2-lsp-3.1.10.vsix
 ```
 
 ### Merging upstream
