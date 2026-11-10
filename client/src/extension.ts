@@ -129,6 +129,7 @@ export async function activate(context: ExtensionContext) {
 	const editor_cmds: Record<string, (editor: TextEditor) => unknown> = {
 		'compile': compileScript,
 		'help': quickHelp,
+		'organize.includes': () => commands.executeCommand('editor.action.organizeImports'),
 		'run': editor => runScript(editor),
 		'run.selection': editor => runScript(editor, true),
 	};

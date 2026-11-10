@@ -145,5 +145,6 @@
 	"setting.ahkpatherr": "AutoHotkey解释器不存在, 在'设置-AutoHotkey2.InterpreterPath'中重新指定",
 	"setting.getenverr": "获取脚本内置变量失败, 如 A_MyDocuments, ...",
 	"setting.valueerr": "'设置-AutoHotkey2.{0}'的值无效. 预期为 '{1}'. 具体为: {2}",
-	"setting.versionerr": "当前AutoHotkey.exe不是v2版本, 无法获得正确的语法解析、补全等功能"
+	"setting.versionerr": "当前AutoHotkey.exe不是v2版本, 无法获得正确的语法解析、补全等功能",
+	"ahk2.organize.includes": "整理 #Include"
 }

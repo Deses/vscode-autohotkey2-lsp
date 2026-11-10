@@ -4,7 +4,7 @@
 	"description": "AutoHotkey v2 Language Support, based on vscode-lsp. Fork of thqby's extension with a faster include closure.",
 	"author": "thqby",
 	"publisher": "deses",
-	"version": "3.1.0-deses.1",
+	"version": "3.1.0-deses.2",
 	"license": "LGPLv3.0",
 	"categories": [
 		"Formatters",
@@ -536,6 +536,12 @@
 				"command": "ahk2.set.scriptdir",
 				"title": "%ahk2.set.scriptdir%",
 				"category": "ahk2"
+			},
+			{
+				"enablement": "editorLangId == ahk2",
+				"command": "ahk2.organize.includes",
+				"title": "%ahk2.organize.includes%",
+				"category": "ahk2"
 			}
 		],
 		"menus": {
@@ -550,13 +556,18 @@
 				{
 					"submenu": "ahk2.context",
 					"group": "navigation@0"
+				},
+				{
+					"when": "editorLangId == ahk2",
+					"command": "ahk2.organize.includes",
+					"group": "1_modification@10"
 				}
 			],
 			"editor/title/run": [
 				{
 					"command": "ahk2.run",
 					"group": "navigation@0",
-					"when": "resourceLangId == ahk2 && shellExecutionSupported && !automaton.inGame"
+					"when": "resourceLangId == ahk2 && shellExecutionSupported && !automaton.inGame && !automaton.notRunnable"
 				},
 				{
 					"command": "ahk2.stop",
@@ -698,6 +709,11 @@
 				"command": "ahk2.stop",
 				"key": "ctrl+f6",
 				"when": "editorLangId == ahk2 && !isWeb && ahk2:isRunning"
+			},
+			{
+				"command": "ahk2.organize.includes",
+				"key": "shift+alt+o",
+				"when": "editorLangId == ahk2 && editorTextFocus && !editorReadonly"
 			}
 		],
 		"semanticTokenScopes": [
